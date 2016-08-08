@@ -382,14 +382,29 @@ public class TransactionInput extends ChildMessage implements Serializable {
      * @return true if the disconnection took place, false if it was not connected.
      */
     public boolean disconnect() {
-        if (outpoint.fromTx == null) return false;
-        TransactionOutput output = outpoint.fromTx.getOutput((int) outpoint.getIndex());
-        if (output.getSpentBy() == this) {
-            output.markAsUnspent();
+        if (outpoint.fromTx != null) {
+            TransactionOutput output = outpoint.fromTx.getOutput((int) outpoint
+                    .getIndex());
             outpoint.fromTx = null;
-            return true;
+            if (output.getSpentBy() == this) {
+                output.markAsUnspent();
+                return true;
+            } else {
+                return false;
+            }
         } else {
-            return false;
+            if (outpoint.connectedOutput != null) {
+                TransactionOutput output = outpoint.connectedOutput;
+                outpoint.connectedOutput = null;
+                if (output.getSpentBy() == this) {
+                    output.markAsUnspent();
+                    return true;
+                } else {
+                    return false;
+                }
+            } else {
+                return false;
+            }
         }
     }
 
