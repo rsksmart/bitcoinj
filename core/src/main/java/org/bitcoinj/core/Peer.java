@@ -1094,6 +1094,7 @@ public class Peer extends PeerSocketHandler {
                 // The block was successfully linked into the chain. Notify the user of our progress.
                 invokeOnBlocksDownloaded(m.getBlockHeader(), m);
             } else {
+            	invokeOnBlocksDownloadedRSKBtcLockClient(m.getBlockHeader(), m);
                 // This block is an orphan - we don't know how to get from it back to the genesis block yet. That
                 // must mean that there are blocks we are missing, so do another getblocks with a new block locator
                 // to ask the peer to send them to us. This can happen during the initial block chain download where
@@ -1162,6 +1163,24 @@ public class Peer extends PeerSocketHandler {
                     registration.listener.onBlocksDownloaded(Peer.this, block, fb, blocksLeft);
                 }
             });
+        }
+    }
+    
+    // Nasty hack to make BitcoinWrapperImpl's PeerEventListener to be called when several blocks are received "at the same time"
+    // ie we have block 306, we receive an inv for block 308, we send a getdata for block 308, it is not connected to our blockchain,
+    // then we request block 307, when we receive block 307 invokeOnBlocksDownloaded() is called for block 307, but not for block 308.
+    // TODO: Implement a real solution for this. 
+    private void invokeOnBlocksDownloadedRSKBtcLockClient(final Block block, @Nullable final FilteredBlock fb) {
+        final int blocksLeft = Math.max(0, (int) vPeerVersionMessage.bestHeight - checkNotNull(blockChain).getBestChainHeight());
+        for (final ListenerRegistration<BlocksDownloadedEventListener> registration : blocksDownloadedEventListeners) {
+            if (registration.listener.getClass().getName().contains("BitcoinWrapperImpl")) {
+                registration.executor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        registration.listener.onBlocksDownloaded(Peer.this, block, fb, blocksLeft);                        
+                    }
+                });
+            }            
         }
     }
 
