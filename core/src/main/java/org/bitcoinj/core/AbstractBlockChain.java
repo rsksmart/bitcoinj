@@ -109,9 +109,10 @@ public abstract class AbstractBlockChain {
     // Holds a block header and, optionally, a list of tx hashes or block's transactions
     class OrphanBlock {
         final Block block;
+        final FilteredBlock filteredBlock;
         final List<Sha256Hash> filteredTxHashes;
         final Map<Sha256Hash, Transaction> filteredTxn;
-        OrphanBlock(Block block, @Nullable List<Sha256Hash> filteredTxHashes, @Nullable Map<Sha256Hash, Transaction> filteredTxn) {
+        OrphanBlock(Block block, @Nullable List<Sha256Hash> filteredTxHashes, @Nullable Map<Sha256Hash, Transaction> filteredTxn, FilteredBlock filteredBlock) {
             final boolean filtered = filteredTxHashes != null && filteredTxn != null;
             Preconditions.checkArgument((block.transactions == null && filtered)
                                         || (block.transactions != null && !filtered));
@@ -121,6 +122,10 @@ public abstract class AbstractBlockChain {
                 this.block = block;
             this.filteredTxHashes = filteredTxHashes;
             this.filteredTxn = filteredTxn;
+            this.filteredBlock = filteredBlock;
+        }
+        public Boolean hasFilteredBlock() {
+            return filteredBlock != null;
         }
     }
     // Holds blocks that we have received but can't plug into the chain yet, eg because they were created whilst we
@@ -275,20 +280,7 @@ public abstract class AbstractBlockChain {
      * Accessing block's transactions in another thread while this method runs may result in undefined behavior.
      */
     public boolean add(Block block) throws VerificationException, PrunedException {
-        try {
-            return add(block, true, null, null);
-        } catch (BlockStoreException e) {
-            // TODO: Figure out a better way to propagate this exception to the user.
-            throw new RuntimeException(e);
-        } catch (VerificationException e) {
-            try {
-                notSettingChainHead();
-            } catch (BlockStoreException e1) {
-                throw new RuntimeException(e1);
-            }
-            throw new VerificationException("Could not verify block " + block.getHashAsString() + "\n" +
-                    block.toString(), e);
-        }
+        return addBlock(block).success();
     }
     
     /**
@@ -297,6 +289,30 @@ public abstract class AbstractBlockChain {
      * If the block can be connected to the chain, returns true.
      */
     public boolean add(FilteredBlock block) throws VerificationException, PrunedException {
+        return addBlock(block).success();
+    }
+    
+    /**
+     * Same as add(Block block) method, but returns an BlockchainAddResult that informs the global result plus a list 
+     * of blocks added during the execution of the add process.
+     */
+    public BlockchainAddResult addBlock(Block block) throws VerificationException, PrunedException {
+        return runAddProcces(block, true, null, null, null);
+    }
+    
+    /**
+     * Same as add(FilteredBlock block) method, but returns an BlockchainAddResult that informs the global result plus a list 
+     * of blocks added during the execution of the add process.
+     */
+    public BlockchainAddResult addBlock(FilteredBlock block) throws VerificationException, PrunedException {
+        return runAddProcces(block.getBlockHeader(), true, block.getTransactionHashes(), block.getAssociatedTransactions(), block);
+    }
+    
+    /**
+     * This code was duplicated on add(Block) and in add(FilteredBlock), as the original comment says. The way to handle exceptions should be improved
+     */
+    private BlockchainAddResult runAddProcces(Block block, boolean tryConnecting,
+            @Nullable List<Sha256Hash> filteredTxHashList, @Nullable Map<Sha256Hash, Transaction> filteredTxn, FilteredBlock filteredBlock) throws VerificationException, PrunedException {
         try {
             // The block has a list of hashes of transactions that matched the Bloom filter, and a list of associated
             // Transaction objects. There may be fewer Transaction objects than hashes, this is expected. It can happen
@@ -305,7 +321,7 @@ public abstract class AbstractBlockChain {
             // a false positive, as expected in any Bloom filtering scheme). The filteredTxn list here will usually
             // only be full of data when we are catching up to the head of the chain and thus haven't witnessed any
             // of the transactions.
-            return add(block.getBlockHeader(), true, block.getTransactionHashes(), block.getAssociatedTransactions());
+            return add(block, tryConnecting, filteredTxHashList, filteredTxn, filteredBlock);
         } catch (BlockStoreException e) {
             // TODO: Figure out a better way to propagate this exception to the user.
             throw new RuntimeException(e);
@@ -319,7 +335,7 @@ public abstract class AbstractBlockChain {
                     block.toString(), e);
         }
     }
-    
+
     /**
      * Whether or not we are maintaining a set of unspent outputs and are verifying all transactions.
      * Also indicates that all calls to add() should provide a block containing transactions
@@ -349,19 +365,22 @@ public abstract class AbstractBlockChain {
     protected abstract TransactionOutputChanges connectTransactions(StoredBlock newBlock) throws VerificationException, BlockStoreException, PrunedException;    
     
     // filteredTxHashList contains all transactions, filteredTxn just a subset
-    private boolean add(Block block, boolean tryConnecting,
-                        @Nullable List<Sha256Hash> filteredTxHashList, @Nullable Map<Sha256Hash, Transaction> filteredTxn)
+    private BlockchainAddResult add(Block block, boolean tryConnecting,
+                        @Nullable List<Sha256Hash> filteredTxHashList, @Nullable Map<Sha256Hash, Transaction> filteredTxn, FilteredBlock filteredBlock)
             throws BlockStoreException, VerificationException, PrunedException {
         // TODO: Use read/write locks to ensure that during chain download properties are still low latency.
         lock.lock();
+        BlockchainAddResult result = new BlockchainAddResult();
         try {
             // Quick check for duplicates to avoid an expensive check further down (in findSplit). This can happen a lot
             // when connecting orphan transactions due to the dumb brute force algorithm we use.
             if (block.equals(getChainHead().getHeader())) {
-                return true;
+                result.setSuccess(Boolean.TRUE);
+                return result;
             }
             if (tryConnecting && orphanBlocks.containsKey(block.getHash())) {
-                return false;
+                result.setSuccess(Boolean.FALSE);
+                return result;
             }
 
             // If we want to verify transactions (ie we are running with full blocks), verify that block has transactions
@@ -371,7 +390,8 @@ public abstract class AbstractBlockChain {
             // Check for already-seen block, but only for full pruned mode, where the DB is
             // more likely able to handle these queries quickly.
             if (shouldVerifyTransactions() && blockStore.get(block.getHash()) != null) {
-                return true;
+                result.setSuccess(Boolean.TRUE);
+                return result;
             }
 
             // Does this block contain any transactions we might care about? Check this up front before verifying the
@@ -405,19 +425,26 @@ public abstract class AbstractBlockChain {
                 // have more blocks.
                 checkState(tryConnecting, "bug in tryConnectingOrphans");
                 log.warn("Block does not connect: {} prev {}", block.getHashAsString(), block.getPrevBlockHash());
-                orphanBlocks.put(block.getHash(), new OrphanBlock(block, filteredTxHashList, filteredTxn));
-                return false;
+                orphanBlocks.put(block.getHash(), new OrphanBlock(block, filteredTxHashList, filteredTxn, filteredBlock));
+                result.setSuccess(Boolean.FALSE);
+                return result;
             } else {
                 checkState(lock.isHeldByCurrentThread());
                 // It connects to somewhere on the chain. Not necessarily the top of the best known chain.
                 params.checkDifficultyTransitions(storedPrev, block, blockStore);
                 connectBlock(block, storedPrev, shouldVerifyTransactions(), filteredTxHashList, filteredTxn);
             }
-
-            if (tryConnecting)
-                tryConnectingOrphans();
-
-            return true;
+            
+            if (tryConnecting) {
+                List<OrphanBlock> orphans = tryConnectingOrphans();
+                for(OrphanBlock ob : orphans) {
+                    result.addOrphan(ob.block);
+                    if(ob.hasFilteredBlock())
+                        result.addFilteredOrphan(ob.filteredBlock);
+                }
+            }
+            result.setSuccess(Boolean.TRUE);
+            return result;
         } finally {
             lock.unlock();
         }
@@ -792,7 +819,7 @@ public abstract class AbstractBlockChain {
     /**
      * For each block in orphanBlocks, see if we can now fit it on top of the chain and if so, do so.
      */
-    private void tryConnectingOrphans() throws VerificationException, BlockStoreException, PrunedException {
+    private List<OrphanBlock> tryConnectingOrphans() throws VerificationException, BlockStoreException, PrunedException {
         checkState(lock.isHeldByCurrentThread());
         // For each block in our orphan list, try and fit it onto the head of the chain. If we succeed remove it
         // from the list and keep going. If we changed the head of the list at the end of the round try again until
@@ -800,6 +827,7 @@ public abstract class AbstractBlockChain {
         //
         // This algorithm is kind of crappy, we should do a topo-sort then just connect them in order, but for small
         // numbers of orphan blocks it does OK.
+        List<OrphanBlock> orphansAdded = new ArrayList<OrphanBlock>();
         int blocksConnectedThisRound;
         do {
             blocksConnectedThisRound = 0;
@@ -816,7 +844,8 @@ public abstract class AbstractBlockChain {
                 // Otherwise we can connect it now.
                 // False here ensures we don't recurse infinitely downwards when connecting huge chains.
                 log.info("Connected orphan {}", orphanBlock.block.getHash());
-                add(orphanBlock.block, false, orphanBlock.filteredTxHashes, orphanBlock.filteredTxn);
+                add(orphanBlock.block, false, orphanBlock.filteredTxHashes, orphanBlock.filteredTxn, orphanBlock.filteredBlock);
+                orphansAdded.add(orphanBlock);
                 iter.remove();
                 blocksConnectedThisRound++;
             }
@@ -824,6 +853,7 @@ public abstract class AbstractBlockChain {
                 log.info("Connected {} orphan blocks.", blocksConnectedThisRound);
             }
         } while (blocksConnectedThisRound > 0);
+        return orphansAdded;
     }
 
     /**
