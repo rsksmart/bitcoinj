@@ -14,33 +14,33 @@ public class BlockchainAddResult {
 
 	private Boolean success = Boolean.FALSE;
 
-	private List<Block> orphansBlocksAdded = new ArrayList<Block>();
-	private List<FilteredBlock> orphansFilteredBlocksAdded = new ArrayList<FilteredBlock>();
+	private List<Block> orphansBlocksConnected = new ArrayList<Block>();
+	private List<FilteredBlock> orphansFilteredBlocksConnected = new ArrayList<FilteredBlock>();
 
 
 
-	public void addOrphan(Block block) {
-		orphansBlocksAdded.add(block);
+	public void addConnectedOrphan(Block block) {
+		orphansBlocksConnected.add(block);
 	}
 
-	public void addOrphans(List<Block> blocks) {
-		orphansBlocksAdded.addAll(blocks);
+	public void addConnectedOrphans(List<Block> blocks) {
+		orphansBlocksConnected.addAll(blocks);
 	}
 
-	public void addFilteredOrphan(FilteredBlock block) {
-		orphansFilteredBlocksAdded.add(block);
+	public void addConnectedFilteredOrphan(FilteredBlock block) {
+		orphansFilteredBlocksConnected.add(block);
 	}
 
 	public void addFilteredOrphans(List<FilteredBlock> blocks) {
-		orphansFilteredBlocksAdded.addAll(blocks);
+		orphansFilteredBlocksConnected.addAll(blocks);
 	}
 
-	public List<Block> getOrphansBlockAdded() {
-		return orphansBlocksAdded;
+	public List<Block> getOrphansBlockConnected() {
+		return orphansBlocksConnected;
 	}
 	
-	public List<FilteredBlock> getFilteredOrphansAdded() {
-		return orphansFilteredBlocksAdded;
+	public List<FilteredBlock> getFilteredOrphansConnected() {
+		return orphansFilteredBlocksConnected;
 	}
 
 	public void setSuccess(Boolean success) {

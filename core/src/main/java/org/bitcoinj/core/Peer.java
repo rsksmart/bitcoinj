@@ -947,7 +947,7 @@ public class Peer extends PeerSocketHandler {
                 // The block was successfully linked into the chain. Notify the user of our progress.
                 invokeOnBlocksDownloaded(m.getBlockHeader(), m);
                 // Orphans were added too
-                for(FilteredBlock fb : result.getFilteredOrphansAdded())
+                for(FilteredBlock fb : result.getFilteredOrphansConnected())
                     invokeOnBlocksDownloaded(fb.getBlockHeader(), fb);
                 
             } else {

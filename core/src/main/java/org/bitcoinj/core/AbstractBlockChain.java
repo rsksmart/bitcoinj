@@ -438,9 +438,9 @@ public abstract class AbstractBlockChain {
             if (tryConnecting) {
                 List<OrphanBlock> orphans = tryConnectingOrphans();
                 for(OrphanBlock ob : orphans) {
-                    result.addOrphan(ob.block);
+                    result.addConnectedOrphan(ob.block);
                     if(ob.hasFilteredBlock())
-                        result.addFilteredOrphan(ob.filteredBlock);
+                        result.addConnectedFilteredOrphan(ob.filteredBlock);
                 }
             }
             result.setSuccess(Boolean.TRUE);
