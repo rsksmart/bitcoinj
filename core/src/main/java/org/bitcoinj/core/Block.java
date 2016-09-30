@@ -678,7 +678,8 @@ public class Block extends Message {
         // Firstly we need to ensure this block does in fact represent real work done. If the difficulty is high
         // enough, it's probably been done by the network.
         checkProofOfWork(true);
-        checkTimestamp();
+        // Oscar: Comment out timestamp check since it depends on local computer time and breaks consensus in RSK Bridge contract
+        // checkTimestamp();
     }
 
     /**

@@ -986,10 +986,11 @@ public class FullBlockTestGenerator {
         blocks.add(new BlockAndValidity(b47, false, true, b44.getHash(), chainHeadHeight + 15, "b47"));
 
         // Block with timestamp > 2h in the future
-        NewBlock b48 = createNextBlock(b44, chainHeadHeight + 16, out15, null);
-        b48.block.setTime(Utils.currentTimeSeconds() + 60 * 60 * 3);
-        b48.solve();
-        blocks.add(new BlockAndValidity(b48, false, true, b44.getHash(), chainHeadHeight + 15, "b48"));
+//        Oscar: Comment out timestamp check since it depends on local computer time and breaks consensus in RSK Bridge contract
+//        NewBlock b48 = createNextBlock(b44, chainHeadHeight + 16, out15, null);
+//        b48.block.setTime(Utils.currentTimeSeconds() + 60 * 60 * 3);
+//        b48.solve();
+//        blocks.add(new BlockAndValidity(b48, false, true, b44.getHash(), chainHeadHeight + 15, "b48"));
 
         // Block with invalid merkle hash
         NewBlock b49 = createNextBlock(b44, chainHeadHeight + 16, out15, null);
