@@ -772,7 +772,8 @@ public class Block extends Message {
         // enough, it's probably been done by the network.
         maybeParseHeader();
         checkProofOfWork(true);
-        checkTimestamp();
+        // Oscar: Comment out timestamp check since it depends on local computer time and breaks consensus in RSK Bridge contract
+        // checkTimestamp();
     }
 
     /**
