@@ -228,6 +228,19 @@ public class WalletAppKit extends AbstractIdleService {
     protected BlockStore provideBlockStore(File file) throws BlockStoreException {
         return new SPVBlockStore(params, file);
     }
+    
+    protected boolean chainFileDelete(File chainFile) {
+        return chainFile.delete();
+    }
+
+    protected File getChainFile() {
+        return new File(directory, filePrefix + ".spvchain");
+    }
+    
+    protected boolean chainFileExists(File chainFile) {
+        return chainFile.exists();        
+    }
+    
 
     /**
      * This method is invoked on a background thread after all objects are initialised, but before the peer group
@@ -354,18 +367,6 @@ public class WalletAppKit extends AbstractIdleService {
         } catch (BlockStoreException e) {
             throw new IOException(e);
         }
-    }
-
-    boolean chainFileDelete(File chainFile) {
-        return chainFile.delete();
-    }
-
-    File getChainFile() {
-        return new File(directory, filePrefix + ".spvchain");
-    }
-    
-    boolean chainFileExists(File chainFile) {
-        return chainFile.exists();        
     }
 
     private Wallet createOrLoadWallet(boolean shouldReplayWallet) throws Exception {
