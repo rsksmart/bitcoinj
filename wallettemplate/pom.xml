@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.bitcoinj</groupId>
         <artifactId>bitcoinj-parent</artifactId>
-        <version>0.13.3-rsk7</version>
+        <version>0.13.3-rsk8</version>
     </parent>
 
     <artifactId>wallettemplate</artifactId>
