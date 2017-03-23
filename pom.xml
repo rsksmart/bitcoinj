@@ -4,7 +4,7 @@
 
   <groupId>org.bitcoinj</groupId>
   <artifactId>bitcoinj-parent</artifactId>
-  <version>0.13.3-rsk8</version>
+  <version>0.13.3-rsk9</version>
   <packaging>pom</packaging>
 
   <modules>

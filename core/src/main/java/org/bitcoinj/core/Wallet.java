@@ -3328,6 +3328,12 @@ public class Wallet extends BaseTaggableObject implements Serializable, BlockCha
          * of the payment request that initiated the transaction.
          */
         public String memo = null;
+        
+        /**
+        * If false (default value), tx fee is paid by the sender
+        * If true, tx fee is paid by the recipient/s. If there is more than one recipient, the tx fee is split equally between them regardless of output value and size.
+        */
+        public boolean recipientsPayFees = false;         
 
         // Tracks if this has been passed to wallet.completeTx already: just a safety check.
         private boolean completed;
@@ -3401,6 +3407,7 @@ public class Wallet extends BaseTaggableObject implements Serializable, BlockCha
             helper.add("aesKey", aesKey != null ? "set" : null); // careful to not leak the key
             helper.add("coinSelector", coinSelector);
             helper.add("shuffleOutputs", shuffleOutputs);
+            helper.add("recipientsPayFees", recipientsPayFees);
             return helper.toString();
         }
     }
@@ -3655,12 +3662,14 @@ public class Wallet extends BaseTaggableObject implements Serializable, BlockCha
 
             CoinSelection bestCoinSelection;
             TransactionOutput bestChangeOutput = null;
+            List<Coin> updatedOutputValues = null;
             if (!req.emptyWallet) {
                 // This can throw InsufficientMoneyException.
                 FeeCalculation feeCalculation;
                 feeCalculation = calculateFee(req, value, originalInputs, needAtLeastReferenceFee, candidates);
                 bestCoinSelection = feeCalculation.bestCoinSelection;
                 bestChangeOutput = feeCalculation.bestChangeOutput;
+                updatedOutputValues = feeCalculation.updatedOutputValues;
             } else {
                 // We're being asked to empty the wallet. What this means is ensuring "tx" has only a single output
                 // of the total value we can currently spend as determined by the selector, and then subtracting the fee.
@@ -3682,6 +3691,12 @@ public class Wallet extends BaseTaggableObject implements Serializable, BlockCha
                 if (!adjustOutputDownwardsForFee(tx, bestCoinSelection, baseFee, feePerKb))
                     throw new CouldNotAdjustDownwards();
             }
+            
+            if (updatedOutputValues != null) {
+                for (int i = 0; i < updatedOutputValues.size(); i++) {
+                    req.tx.getOutput(i).setValue(updatedOutputValues.get(i));
+                }
+            }            
 
             if (bestChangeOutput != null) {
                 req.tx.addOutput(bestChangeOutput);
@@ -4492,201 +4507,123 @@ public class Wallet extends BaseTaggableObject implements Serializable, BlockCha
     /******************************************************************************************************************/
 
     private static class FeeCalculation {
+        // Selected UTXOs to spend
         public CoinSelection bestCoinSelection;
+        // Change output (may be null if no change)
         public TransactionOutput bestChangeOutput;
+        // List of output values adjusted downwards when recipients pay fees (may be null if no adjustment needed).
+        public List<Coin> updatedOutputValues;
     }
 
     //region Fee calculation code
 
-    public FeeCalculation calculateFee(SendRequest req, Coin value, List<TransactionInput> originalInputs,
-                                       boolean needAtLeastReferenceFee, List<TransactionOutput> candidates) throws InsufficientMoneyException {
+    public FeeCalculation calculateFee(SendRequest req, Coin value, List<TransactionInput> originalInputs, 
+                                     boolean needAtLeastReferenceFee, List<TransactionOutput> candidates) throws InsufficientMoneyException {
         checkState(lock.isHeldByCurrentThread());
-        FeeCalculation result = new FeeCalculation();
-        // There are 3 possibilities for what adding change might do:
-        // 1) No effect
-        // 2) Causes increase in fee (change < 0.01 COINS)
-        // 3) Causes the transaction to have a dust output or change < fee increase (ie change will be thrown away)
-        // If we get either of the last 2, we keep note of what the inputs looked like at the time and try to
-        // add inputs as we go up the list (keeping track of minimum inputs for each category).  At the end, we pick
-        // the best input set as the one which generates the lowest total fee.
-        Coin additionalValueForNextCategory = null;
-        CoinSelection selection3 = null;
-        CoinSelection selection2 = null;
-        TransactionOutput selection2Change = null;
-        CoinSelection selection1 = null;
-        TransactionOutput selection1Change = null;
-        // We keep track of the last size of the transaction we calculated but only if the act of adding inputs and
-        // change resulted in the size crossing a 1000 byte boundary. Otherwise it stays at zero.
-        int lastCalculatedSize = 0;
-        Coin valueNeeded, valueMissing = null;
+        FeeCalculation result;
+        Coin fee = Coin.ZERO;        
         while (true) {
-            resetTxInputs(req, originalInputs);
-
-            Coin fees = req.fee == null ? Coin.ZERO : req.fee;
-            if (lastCalculatedSize > 0) {
-                // If the size is exactly 1000 bytes then we'll over-pay, but this should be rare.
-                fees = fees.add(req.feePerKb.multiply((lastCalculatedSize / 1000) + 1));
-            } else {
-                fees = fees.add(req.feePerKb);  // First time around the loop.
+            result = new FeeCalculation();
+            Transaction tx = new Transaction(params);
+            addSuppliedInputs(tx, req.tx.getInputs());
+            
+            Coin valueNeeded = value;
+            if (!req.recipientsPayFees) {
+              valueNeeded = valueNeeded.add(fee);              
             }
-            if (needAtLeastReferenceFee && fees.compareTo(Transaction.REFERENCE_DEFAULT_MIN_TX_FEE) < 0)
-                fees = Transaction.REFERENCE_DEFAULT_MIN_TX_FEE;
-
-            valueNeeded = value.add(fees);
-            if (additionalValueForNextCategory != null)
-                valueNeeded = valueNeeded.add(additionalValueForNextCategory);
-            Coin additionalValueSelected = additionalValueForNextCategory;
-
-            // Of the coins we could spend, pick some that we actually will spend.
+            if (req.recipientsPayFees) {
+                result.updatedOutputValues = new ArrayList<Coin>();
+            }
+            for (int i = 0; i < req.tx.getOutputs().size(); i++) {
+                TransactionOutput output = new TransactionOutput(params, tx, req.tx.getOutputs().get(i).bitcoinSerialize(), 0);
+                if (req.recipientsPayFees) {
+                    // Subtract fee equally from each selected recipient
+                    output.setValue(output.getValue().subtract(fee.divide(req.tx.getOutputs().size())));
+                    // first receiver pays the remainder not divisible by output count
+                    if (i==0) {    
+                        output.setValue(output.getValue().subtract(fee.divideAndRemainder(req.tx.getOutputs().size())[1])); // Subtract fee equally from each selected recipient                      
+                    }
+                    result.updatedOutputValues.add(output.getValue());
+                    if (output.getMinNonDustValue().isGreaterThan(output.getValue())) {
+                        throw new CouldNotAdjustDownwards();
+                    }
+                }
+                tx.addOutput(output);
+            }
             CoinSelector selector = req.coinSelector == null ? coinSelector : req.coinSelector;
             // selector is allowed to modify candidates list.
             CoinSelection selection = selector.select(valueNeeded, new LinkedList<TransactionOutput>(candidates));
+            result.bestCoinSelection = selection;
             // Can we afford this?
             if (selection.valueGathered.compareTo(valueNeeded) < 0) {
-                valueMissing = valueNeeded.subtract(selection.valueGathered);
-                break;
+                Coin valueMissing = valueNeeded.subtract(selection.valueGathered);
+                throw new InsufficientMoneyException(valueMissing);
             }
-            checkState(selection.gathered.size() > 0 || originalInputs.size() > 0);
-
-            // We keep track of an upper bound on transaction size to calculate fees that need to be added.
-            // Note that the difference between the upper bound and lower bound is usually small enough that it
-            // will be very rare that we pay a fee we do not need to.
-            //
-            // We can't be sure a selection is valid until we check fee per kb at the end, so we just store
-            // them here temporarily.
-            boolean eitherCategory2Or3 = false;
-            boolean isCategory3 = false;
-
             Coin change = selection.valueGathered.subtract(valueNeeded);
-            if (additionalValueSelected != null)
-                change = change.add(additionalValueSelected);
-
-            // If change is < 0.01 BTC, we will need to have at least minfee to be accepted by the network
-            if (req.ensureMinRequiredFee && !change.equals(Coin.ZERO) &&
-                    change.compareTo(Coin.CENT) < 0 && fees.compareTo(Transaction.REFERENCE_DEFAULT_MIN_TX_FEE) < 0) {
-                // This solution may fit into category 2, but it may also be category 3, we'll check that later
-                eitherCategory2Or3 = true;
-                additionalValueForNextCategory = Coin.CENT;
-                // If the change is smaller than the fee we want to add, this will be negative
-                change = change.subtract(Transaction.REFERENCE_DEFAULT_MIN_TX_FEE.subtract(fees));
-            }
-
-            int size = 0;
-            TransactionOutput changeOutput = null;
-            if (change.signum() > 0) {
+            if (change.isGreaterThan(Coin.ZERO)) {
                 // The value of the inputs is greater than what we want to send. Just like in real life then,
                 // we need to take back some coins ... this is called "change". Add another output that sends the change
                 // back to us. The address comes either from the request or getChangeAddress() as a default.
                 Address changeAddress = req.changeAddress;
                 if (changeAddress == null)
                     changeAddress = getChangeAddress();
-                changeOutput = new TransactionOutput(params, req.tx, change, changeAddress);
-                // If the change output would result in this transaction being rejected as dust, just drop the change and make it a fee
-                if (req.ensureMinRequiredFee && Transaction.MIN_NONDUST_OUTPUT.compareTo(change) >= 0) {
-                    // This solution definitely fits in category 3
-                    isCategory3 = true;
-                    additionalValueForNextCategory = Transaction.REFERENCE_DEFAULT_MIN_TX_FEE.add(
-                                                     Transaction.MIN_NONDUST_OUTPUT.add(Coin.SATOSHI));
-                } else {
-                    size += changeOutput.bitcoinSerialize().length + VarInt.sizeOf(req.tx.getOutputs().size()) - VarInt.sizeOf(req.tx.getOutputs().size() - 1);
-                    // This solution is either category 1 or 2
-                    if (!eitherCategory2Or3) // must be category 1
-                        additionalValueForNextCategory = null;
+                TransactionOutput changeOutput = new TransactionOutput(params, tx, change, changeAddress);
+                if (req.recipientsPayFees && changeOutput.getMinNonDustValue().isGreaterThan(changeOutput.getValue())) {
+                    // We do not move dust-change to fees, because the sender would end up paying more than requested.
+                    // This would be against the purpose of the all-inclusive feature.
+                    // So instead we raise the change and deduct from the first recipient.                
+                    Coin missingToNotBeDust = changeOutput.getMinNonDustValue().subtract(changeOutput.getValue());
+                    changeOutput.setValue(changeOutput.getValue().add(missingToNotBeDust));
+                    TransactionOutput firstOutput = tx.getOutputs().get(0); 
+                    firstOutput.setValue(firstOutput.getValue().subtract(missingToNotBeDust));
+                    result.updatedOutputValues.set(0, firstOutput.getValue());
+                    if (firstOutput.getMinNonDustValue().isGreaterThan(firstOutput.getValue())) {
+                        throw new CouldNotAdjustDownwards();
+                    }
                 }
-            } else {
-                if (eitherCategory2Or3) {
-                    // This solution definitely fits in category 3 (we threw away change because it was smaller than MIN_TX_FEE)
-                    isCategory3 = true;
-                    additionalValueForNextCategory = Transaction.REFERENCE_DEFAULT_MIN_TX_FEE.add(Coin.SATOSHI);
+                if (changeOutput.getMinNonDustValue().isGreaterThan(changeOutput.getValue())) {
+                    // Never create dust outputs; if we would, just
+                    // add the dust to the fee.
+                    // Oscar comment: This seems like a way to make the condition below "if (!fee.isLessThan(feeNeeded))" to become true.
+                    // This is a non-easy to understand way to do that. 
+                    // Maybe there are other effects I am missing
+                    fee = fee.add(changeOutput.getValue());                    
+                } else {
+                    tx.addOutput(changeOutput);
+                    result.bestChangeOutput = changeOutput;
                 }
             }
-
-            // Now add unsigned inputs for the selected coins.
-            for (TransactionOutput output : selection.gathered) {
-                TransactionInput input = req.tx.addInput(output);
+            
+            for (TransactionOutput selectedOutput : selection.gathered) {
+                TransactionInput input = tx.addInput(selectedOutput);                
                 // If the scriptBytes don't default to none, our size calculations will be thrown off.
                 checkState(input.getScriptBytes().length == 0);
             }
 
-            // Estimate transaction size and loop again if we need more fee per kb. The serialized tx doesn't
-            // include things we haven't added yet like input signatures/scripts or the change output.
-            size += req.tx.bitcoinSerialize().length;
+            int size = tx.unsafeBitcoinSerialize().length;
             size += estimateBytesForSigning(selection);
-            if (size/1000 > lastCalculatedSize/1000 && req.feePerKb.signum() > 0) {
-                lastCalculatedSize = size;
-                // We need more fees anyway, just try again with the same additional value
-                additionalValueForNextCategory = additionalValueSelected;
-                continue;
+
+            Coin feePerKb = req.feePerKb;
+            if (needAtLeastReferenceFee && feePerKb.compareTo(Transaction.REFERENCE_DEFAULT_MIN_TX_FEE) < 0) {
+                feePerKb = Transaction.REFERENCE_DEFAULT_MIN_TX_FEE;                
+            } 
+            Coin feeNeeded = feePerKb.multiply(size).divide(1000);
+            
+            if (!fee.isLessThan(feeNeeded)) {
+                // Done, enough fee included.
+                break;                 
             }
-
-            if (isCategory3) {
-                if (selection3 == null)
-                    selection3 = selection;
-            } else if (eitherCategory2Or3) {
-                // If we are in selection2, we will require at least CENT additional. If we do that, there is no way
-                // we can end up back here because CENT additional will always get us to 1
-                checkState(selection2 == null);
-                checkState(additionalValueForNextCategory.equals(Coin.CENT));
-                selection2 = selection;
-                selection2Change = checkNotNull(changeOutput); // If we get no change in category 2, we are actually in category 3
-            } else {
-                // Once we get a category 1 (change kept), we should break out of the loop because we can't do better
-                checkState(selection1 == null);
-                checkState(additionalValueForNextCategory == null);
-                selection1 = selection;
-                selection1Change = changeOutput;
-            }
-
-            if (additionalValueForNextCategory != null) {
-                if (additionalValueSelected != null)
-                    checkState(additionalValueForNextCategory.compareTo(additionalValueSelected) > 0);
-                continue;
-            }
-            break;
-        }
-
-        resetTxInputs(req, originalInputs);
-
-        if (selection3 == null && selection2 == null && selection1 == null) {
-            checkNotNull(valueMissing);
-            log.warn("Insufficient value in wallet for send: needed {} more", valueMissing.toFriendlyString());
-            throw new InsufficientMoneyException(valueMissing);
-        }
-
-        Coin lowestFee = null;
-        result.bestCoinSelection = null;
-        result.bestChangeOutput = null;
-        if (selection1 != null) {
-            if (selection1Change != null)
-                lowestFee = selection1.valueGathered.subtract(selection1Change.getValue());
-            else
-                lowestFee = selection1.valueGathered;
-            result.bestCoinSelection = selection1;
-            result.bestChangeOutput = selection1Change;
-        }
-
-        if (selection2 != null) {
-            Coin fee = selection2.valueGathered.subtract(checkNotNull(selection2Change).getValue());
-            if (lowestFee == null || fee.compareTo(lowestFee) < 0) {
-                lowestFee = fee;
-                result.bestCoinSelection = selection2;
-                result.bestChangeOutput = selection2Change;
-            }
-        }
-
-        if (selection3 != null) {
-            if (lowestFee == null || selection3.valueGathered.compareTo(lowestFee) < 0) {
-                result.bestCoinSelection = selection3;
-                result.bestChangeOutput = null;
-            }
+            
+            // Include more fee and try again.
+            fee = feeNeeded;
         }
         return result;
-    }
+        
+    }        
 
-    private void resetTxInputs(SendRequest req, List<TransactionInput> originalInputs) {
-        req.tx.clearInputs();
+    private void addSuppliedInputs(Transaction tx, List<TransactionInput> originalInputs) {
         for (TransactionInput input : originalInputs)
-            req.tx.addInput(input);
+            tx.addInput(new TransactionInput(params, tx, input.bitcoinSerialize()));
     }
 
     private int estimateBytesForSigning(CoinSelection selection) {
