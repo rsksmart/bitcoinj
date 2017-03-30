@@ -22,7 +22,7 @@
     <parent>
         <groupId>org.bitcoinj</groupId>
         <artifactId>bitcoinj-parent</artifactId>
-        <version>0.13.3-rsk9</version>
+		<version>0.13.3-rsk-9</version>
     </parent>
 
     <artifactId>bitcoinj-core</artifactId>
@@ -218,7 +218,6 @@
                                         <urn>com.squareup.okio:okio:1.2.0:jar:null:runtime:c0b52915a48fa91b1b94a28d4a2997bac5f524df</urn>
                                         <urn>org.slf4j:slf4j-api:1.7.7:jar:null:compile:2b8019b6249bb05d81d3a3094e468753e2b21311</urn>
                                         <urn>org.slf4j:slf4j-jdk14:1.7.7:jar:null:test:25d160723ea37a6cb84e87cd70773ff02997e857</urn>
-                                        <urn>org.sonatype.plugins:nexus-staging-maven-plugin:1.6.5:maven-plugin:null:runtime:455ca2aa8cd14a06608f1538bd6a1efd09561563</urn>
                                         <urn>postgresql:postgresql:9.1-901.jdbc4:jar:null:compile:153f2f92a786f12fc111d0111f709012df87c808</urn>
                                         <!-- A check for the rules themselves -->
                                         <urn>uk.co.froot.maven.enforcer:digest-enforcer-rules:0.0.1:jar:null:runtime:16a9e04f3fe4bb143c42782d07d5faf65b32106f</urn>
@@ -238,36 +237,6 @@
                     </dependency>
                 </dependencies>
 
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <executions>
-                    <!-- Create the bundled JAR, it's easier for some people -->
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                        <configuration>
-                            <minimizeJar>false</minimizeJar>
-                            <filters>
-                                <filter>
-                                    <!-- exclude signatures, the bundling process breaks them for some reason -->
-                                    <artifact>*:*</artifact>
-                                    <excludes>
-                                        <exclude>META-INF/*.SF</exclude>
-                                        <exclude>META-INF/*.DSA</exclude>
-                                        <exclude>META-INF/*.RSA</exclude>
-                                    </excludes>
-                                </filter>
-                            </filters>
-                            <shadedArtifactAttached>true</shadedArtifactAttached>
-                            <shadedClassifierName>bundled</shadedClassifierName>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
 
             <!-- Code coverage plugin, generates coverage report to target/site/jacoco/
@@ -504,5 +473,4 @@
             <version>2.2.0</version>
         </dependency>
     </dependencies>
-
 </project>
