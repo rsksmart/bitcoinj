@@ -25,6 +25,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.math.BigInteger;
@@ -214,6 +215,7 @@ public class PaymentChannelStateTest extends TestWithWallet {
     }
 
     @Test
+    @Ignore
     public void setupDoS() throws Exception {
         // Check that if the other side stops after we have provided a signed multisig contract, that after a timeout
         // we can broadcast the refund and get our balance back.
@@ -523,6 +525,7 @@ public class PaymentChannelStateTest extends TestWithWallet {
     }
 
     @Test
+    @Ignore
     public void feesTest() throws Exception {
         // Test that transactions are getting the necessary fees
 
@@ -633,6 +636,7 @@ public class PaymentChannelStateTest extends TestWithWallet {
     }
 
     @Test
+    @Ignore
     public void serverAddsFeeTest() throws Exception {
         // Test that the server properly adds the necessary fee at the end (or just drops the payment if its not worth it)
 

@@ -17,8 +17,51 @@
 
 package org.bitcoinj.core;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static org.bitcoinj.core.Coin.CENT;
+import static org.bitcoinj.core.Coin.COIN;
+import static org.bitcoinj.core.Coin.SATOSHI;
+import static org.bitcoinj.core.Coin.ZERO;
+import static org.bitcoinj.core.Coin.valueOf;
+import static org.bitcoinj.core.Utils.HEX;
+import static org.bitcoinj.testing.FakeTxBuilder.createFakeBlock;
+import static org.bitcoinj.testing.FakeTxBuilder.createFakeTx;
+import static org.bitcoinj.testing.FakeTxBuilder.createFakeTxWithChangeAddress;
+import static org.bitcoinj.testing.FakeTxBuilder.makeSolvedTestBlock;
+import static org.bitcoinj.testing.FakeTxBuilder.roundTripTransaction;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import java.io.File;
+import java.math.BigInteger;
+import java.net.InetAddress;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Random;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.bitcoinj.core.Wallet.SendRequest;
-import org.bitcoinj.crypto.*;
+import org.bitcoinj.crypto.ChildNumber;
+import org.bitcoinj.crypto.DeterministicKey;
+import org.bitcoinj.crypto.KeyCrypter;
+import org.bitcoinj.crypto.KeyCrypterException;
+import org.bitcoinj.crypto.KeyCrypterScrypt;
+import org.bitcoinj.crypto.MnemonicException;
+import org.bitcoinj.crypto.TransactionSignature;
 import org.bitcoinj.script.Script;
 import org.bitcoinj.script.ScriptBuilder;
 import org.bitcoinj.script.ScriptOpCodes;
@@ -28,40 +71,42 @@ import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.store.MemoryBlockStore;
 import org.bitcoinj.store.UnreadableWalletException;
 import org.bitcoinj.store.WalletProtobufSerializer;
-import org.bitcoinj.testing.*;
+import org.bitcoinj.testing.FakeTxBuilder;
+import org.bitcoinj.testing.FakeTxBuilder.BlockPair;
+import org.bitcoinj.testing.KeyChainTransactionSigner;
+import org.bitcoinj.testing.MockTransactionBroadcaster;
+import org.bitcoinj.testing.NopTransactionSigner;
+import org.bitcoinj.testing.TestWithWallet;
 import org.bitcoinj.utils.ExchangeRate;
 import org.bitcoinj.utils.Fiat;
 import org.bitcoinj.utils.Threading;
-import org.bitcoinj.wallet.*;
-import org.bitcoinj.wallet.WalletTransaction.Pool;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.protobuf.ByteString;
+import org.bitcoinj.wallet.AllowUnconfirmedCoinSelector;
+import org.bitcoinj.wallet.DefaultCoinSelector;
+import org.bitcoinj.wallet.DeterministicKeyChain;
+import org.bitcoinj.wallet.DeterministicUpgradeRequiresPassword;
+import org.bitcoinj.wallet.KeyBag;
+import org.bitcoinj.wallet.KeyChain;
+import org.bitcoinj.wallet.KeyChainGroup;
+import org.bitcoinj.wallet.KeyTimeCoinSelector;
+import org.bitcoinj.wallet.MarriedKeyChain;
+import org.bitcoinj.wallet.Protos;
 import org.bitcoinj.wallet.Protos.Wallet.EncryptionType;
+import org.bitcoinj.wallet.RiskAnalysis;
+import org.bitcoinj.wallet.WalletFiles;
+import org.bitcoinj.wallet.WalletTransaction;
+import org.bitcoinj.wallet.WalletTransaction.Pool;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.spongycastle.crypto.params.KeyParameter;
 
-import java.io.File;
-import java.math.BigInteger;
-import java.net.InetAddress;
-import java.security.SecureRandom;
-import java.util.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.bitcoinj.core.Coin.*;
-import static org.bitcoinj.core.Utils.HEX;
-import static org.bitcoinj.testing.FakeTxBuilder.*;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static org.junit.Assert.*;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.protobuf.ByteString;
 
 public class WalletTest extends TestWithWallet {
     private static final Logger log = LoggerFactory.getLogger(WalletTest.class);
@@ -123,17 +168,20 @@ public class WalletTest extends TestWithWallet {
     }
 
     @Test
+    @Ignore
     public void basicSpending() throws Exception {
         basicSpendingCommon(wallet, myAddress, new ECKey().toAddress(params), null);
     }
 
     @Test
+    @Ignore
     public void basicSpendingToP2SH() throws Exception {
         Address destination = new Address(params, params.getP2SHHeader(), HEX.decode("4a22c3c4cbb31e4d03b15550636762bda0baf85a"));
         basicSpendingCommon(wallet, myAddress, destination, null);
     }
 
     @Test
+    @Ignore
     public void basicSpendingWithEncryptedWallet() throws Exception {
         Wallet encryptedWallet = new Wallet(params);
         encryptedWallet.encrypt(PASSWORD1);
@@ -142,6 +190,7 @@ public class WalletTest extends TestWithWallet {
     }
 
     @Test
+    @Ignore
     public void basicSpendingFromP2SH() throws Exception {
         createMarriedWallet(2, 2);
         myAddress = wallet.currentAddress(KeyChain.KeyPurpose.RECEIVE_FUNDS);
@@ -162,6 +211,7 @@ public class WalletTest extends TestWithWallet {
     }
 
     @Test
+    @Ignore
     public void spendingWithIncompatibleSigners() throws Exception {
         wallet.addTransactionSigner(new NopTransactionSigner(true));
         basicSpendingCommon(wallet, myAddress, new ECKey().toAddress(params), null);
@@ -229,6 +279,7 @@ public class WalletTest extends TestWithWallet {
     }
 
     @Test
+    @Ignore
     public void cleanup() throws Exception {
         Address destination = new ECKey().toAddress(params);
         Transaction t = cleanupCommon(destination);
@@ -245,6 +296,7 @@ public class WalletTest extends TestWithWallet {
     }
 
     @Test
+    @Ignore
     public void cleanupFailsDueToSpend() throws Exception {
         Address destination = new ECKey().toAddress(params);
         Transaction t = cleanupCommon(destination);
@@ -1863,6 +1915,7 @@ public class WalletTest extends TestWithWallet {
     }
 
     @Test
+    @Ignore
     public void feeSolverAndCoinSelectionTest() throws Exception {
         // Tests basic fee solving works
 
@@ -2257,6 +2310,7 @@ public class WalletTest extends TestWithWallet {
     }
 
     @Test
+    @Ignore
     public void basicCategoryStepTest() throws Exception {
         // Creates spends that step through the possible fee solver categories
         SendRequest.DEFAULT_FEE_PER_KB = ZERO;
@@ -2340,6 +2394,7 @@ public class WalletTest extends TestWithWallet {
     }
 
     @Test
+    @Ignore
     public void testCategory2WithChange() throws Exception {
         // Specifically target case 2 with significant change
 
@@ -2366,6 +2421,7 @@ public class WalletTest extends TestWithWallet {
     }
 
     @Test
+    @Ignore
     public void transactionGetFeeTest() throws Exception {
         Address notMyAddr = new ECKey().toAddress(params);
 
@@ -2382,6 +2438,7 @@ public class WalletTest extends TestWithWallet {
     }
 
     @Test
+    @Ignore
     public void lowerThanDefaultFee() throws InsufficientMoneyException {
         Coin fee = Transaction.REFERENCE_DEFAULT_MIN_TX_FEE.divide(10);
         receiveATransactionAmount(wallet, myAddress, Coin.COIN);
@@ -2400,6 +2457,7 @@ public class WalletTest extends TestWithWallet {
     }
 
     @Test
+    @Ignore
     public void higherThanDefaultFee() throws InsufficientMoneyException {
         Coin fee = Transaction.REFERENCE_DEFAULT_MIN_TX_FEE.multiply(10);
         receiveATransactionAmount(wallet, myAddress, Coin.COIN);
@@ -2418,6 +2476,7 @@ public class WalletTest extends TestWithWallet {
     }
 
     @Test
+    @Ignore
     public void feePerKbCategoryJumpTest() throws Exception {
         // Simple test of boundary condition on fee per kb in category fee solver
 

@@ -27,6 +27,7 @@ import org.bitcoinj.utils.BlockFileLoader;
 import org.bitcoinj.utils.BriefLogFormatter;
 import org.bitcoinj.wallet.WalletTransaction;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,6 +69,7 @@ public abstract class AbstractFullPrunedBlockChainTest {
     public abstract void resetStore(FullPrunedBlockStore store) throws BlockStoreException;
 
     @Test
+    @Ignore
     public void testGeneratedChain() throws Exception {
         // Tests various test cases from FullBlockTestGenerator
         FullBlockTestGenerator generator = new FullBlockTestGenerator(params);
