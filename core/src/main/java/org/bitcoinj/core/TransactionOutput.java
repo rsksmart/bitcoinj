@@ -434,7 +434,7 @@ public class TransactionOutput extends ChildMessage implements Serializable {
 
         if (!Arrays.equals(scriptBytes, other.scriptBytes)) return false;
         if (value != other.value) return false;
-        if (parent != null && parent != other.parent) return false;
+        if (parent != null && (parent != other.parent || getIndex() != other.getIndex())) return false;
 
         return true;
     }
