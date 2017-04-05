@@ -4,13 +4,11 @@
 
   <groupId>org.bitcoinj</groupId>
   <artifactId>bitcoinj-parent</artifactId>
-  <version>0.13.3-rsk-9</version>
+  <version>0.13.3-rsk-9-consensus</version>
   <packaging>pom</packaging>
 
   <modules>
     <module>core</module>
-    <module>examples</module>
-    <module>tools</module>
   </modules>
 
   <parent>
