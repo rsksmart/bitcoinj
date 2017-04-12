@@ -4862,7 +4862,7 @@ public class Wallet extends BaseTaggableObject
             }
             CoinSelector selector = req.coinSelector == null ? coinSelector : req.coinSelector;
             // selector is allowed to modify candidates list.
-            CoinSelection selection = selector.select(valueNeeded, new LinkedList<>(candidates));
+            CoinSelection selection = selector.select(valueNeeded, new LinkedList<TransactionOutput>(candidates));
             result.bestCoinSelection = selection;
             // Can we afford this?
             if (selection.valueGathered.compareTo(valueNeeded) < 0) {
