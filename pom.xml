@@ -4,14 +4,11 @@
 
   <groupId>org.bitcoinj</groupId>
   <artifactId>bitcoinj-parent</artifactId>
-  <version>0.14.4</version>
+  <version>0.14.4-rsk</version>
   <packaging>pom</packaging>
 
   <modules>
     <module>core</module>
-    <module>examples</module>
-    <module>tools</module>
-    <module>wallettemplate</module>
   </modules>
 
   <parent>
