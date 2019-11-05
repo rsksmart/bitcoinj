@@ -24,6 +24,7 @@ import org.bitcoinj.script.*;
 import org.bitcoinj.testing.*;
 import org.easymock.*;
 import org.junit.*;
+import org.spongycastle.util.encoders.Hex;
 
 import java.math.BigInteger;
 import java.util.*;
@@ -130,7 +131,6 @@ public class TransactionTest {
     @Test
     public void testOptimalEncodingMessageSize() {
         Transaction tx = new Transaction(PARAMS);
-
         int length = tx.length;
 
         // add basic transaction input, check the length
@@ -155,13 +155,13 @@ public class TransactionTest {
         Transaction tx = FakeTxBuilder.createFakeCoinbaseTx(PARAMS);
 
         tx.getConfidence().setConfidenceType(ConfidenceType.UNKNOWN);
-        assertEquals(tx.isMature(), false);
+        assertFalse(tx.isMature());
 
         tx.getConfidence().setConfidenceType(ConfidenceType.PENDING);
-        assertEquals(tx.isMature(), false);
+        assertFalse(tx.isMature());
 
         tx.getConfidence().setConfidenceType(ConfidenceType.DEAD);
-        assertEquals(tx.isMature(), false);
+        assertFalse(tx.isMature());
     }
 
     @Test
@@ -264,8 +264,8 @@ public class TransactionTest {
 
         String str = tx.toString(mockBlockChain);
 
-        assertEquals(str.contains("block " + TEST_LOCK_TIME), true);
-        assertEquals(str.contains("estimated to be reached at"), true);
+        assertTrue(str.contains("block " + TEST_LOCK_TIME));
+        assertTrue(str.contains("estimated to be reached at"));
     }
 
     @Test
@@ -279,13 +279,13 @@ public class TransactionTest {
         };
 
         tx.addInput(ti);
-        assertEquals(tx.toString().contains("[exception: "), true);
+        assertTrue(tx.toString().contains("[exception: "));
     }
 
     @Test
     public void testToStringWhenThereAreZeroInputs() {
         Transaction tx = new Transaction(PARAMS);
-        assertEquals(tx.toString().contains("No inputs!"), true);
+        assertTrue(tx.toString().contains("No inputs!"));
     }
 
     @Test
@@ -306,14 +306,14 @@ public class TransactionTest {
 
         Iterator<Transaction> iterator = set.iterator();
 
-        assertEquals(tx1.equals(tx2), false);
-        assertEquals(tx1.equals(tx3), false);
-        assertEquals(tx1.equals(tx1), true);
+        assertNotEquals(tx1, tx2);
+        assertNotEquals(tx1, tx3);
+        assertEquals(tx1, tx1);
 
-        assertEquals(iterator.next().equals(tx3), true);
-        assertEquals(iterator.next().equals(tx2), true);
-        assertEquals(iterator.next().equals(tx1), true);
-        assertEquals(iterator.hasNext(), false);
+        assertEquals(iterator.next(), tx3);
+        assertEquals(iterator.next(), tx2);
+        assertEquals(iterator.next(), tx1);
+        assertFalse(iterator.hasNext());
     }
 
     @Test(expected = ScriptException.class)
@@ -326,7 +326,6 @@ public class TransactionTest {
         tx.addOutput(fakeTx.getOutput(0));
 
         Script script = ScriptBuilder.createOpReturnScript(new byte[0]);
-
         tx.addSignedInput(fakeTx.getOutput(0).getOutPointFor(), script, key);
     }
 
@@ -403,5 +402,35 @@ public class TransactionTest {
                 }
             };
         }
+    }
+    @Test
+    public void testParseTxtWithWitness()  {
+        // The hash in this test case was created using an address p2sh-segwit.
+        byte[] rawTx = Hex.decode("02000000000101447711046c3c1f4db72f8b3157c49680ee760aa61b75659d9be8747d73ddb6710000000017160014b360da23a791dea490161fbb944b728a21d036c2ffffffff02b8d3f505000000001976a914193a62891c7a8061f12082d469ea137859fa951b88ac00e1f505000000001976a9147d8928e43014111434c5d985736de102721019cc88ac024730440220078458be99e3e262ea60883c16c7bc8fcdb40eda6420f33e7b03c4ecca8fe3180220734a09a4afa9874e1bc4050995e16ba71397e807a19cfce156a184e764a594cd0121038f505a331ea2cc00fbf4793975ef440904ba795356e839c07583f8bec4c07ace00000000");//02000000000101447711046c3c1f4db72f8b3157c49680ee760aa61b75659d9be8747d73ddb6710000000017160014b360da23a791dea490161fbb944b728a21d036c2ffffffff02b8d3f505000000001976a914193a62891c7a8061f12082d469ea137859fa951b88ac00e1f505000000001976a9147d8928e43014111434c5d985736de102721019cc88ac024730440220078458be99e3e262ea60883c16c7bc8fcdb40eda6420f33e7b03c4ecca8fe3180220734a09a4afa9874e1bc4050995e16ba71397e807a19cfce156a184e764a594cd0121038f505a331ea2cc00fbf4793975ef440904ba795356e839c07583f8bec4c07ace00000000
+
+        Transaction tx = new Transaction(PARAMS, rawTx);
+
+        assertTrue(tx.hasWitness());
+        assertEquals(tx.countWitnesses(),1);
+        assertEquals(tx.getInputs().size(),1);
+
+        //signers
+        assertArrayEquals(tx.getWitness(0).getPush(0), Hex.decode("30440220078458be99e3e262ea60883c16c7bc8fcdb40eda6420f33e7b03c4ecca8fe3180220734a09a4afa9874e1bc4050995e16ba71397e807a19cfce156a184e764a594cd01"));
+        //pubkey
+        assertArrayEquals(tx.getWitness(0).getPush(1), Hex.decode("038f505a331ea2cc00fbf4793975ef440904ba795356e839c07583f8bec4c07ace"));
+    }
+
+    @Test
+    public void testSerializerTxtWithWitness() {
+        // The hash in this test case was created using an address p2sh-segwit.
+        byte[] rawTx = Hex.decode("02000000000101447711046c3c1f4db72f8b3157c49680ee760aa61b75659d9be8747d73ddb6710000000017160014b360da23a791dea490161fbb944b728a21d036c2ffffffff02b8d3f505000000001976a914193a62891c7a8061f12082d469ea137859fa951b88ac00e1f505000000001976a9147d8928e43014111434c5d985736de102721019cc88ac024730440220078458be99e3e262ea60883c16c7bc8fcdb40eda6420f33e7b03c4ecca8fe3180220734a09a4afa9874e1bc4050995e16ba71397e807a19cfce156a184e764a594cd0121038f505a331ea2cc00fbf4793975ef440904ba795356e839c07583f8bec4c07ace00000000");
+        Transaction tx = new Transaction(PARAMS, rawTx);
+
+        assertTrue(tx.hasWitness());
+
+        byte[] testing1= tx.bitcoinSerialize();
+
+        assertEquals(rawTx.length, testing1.length);
+        assertArrayEquals(rawTx, tx.bitcoinSerialize());
     }
 }
