@@ -15,3 +15,7 @@ allprojects {
 
     group = 'org.bitcoinj'
 }
+
+subprojects {
+    tasks.withType(Javadoc).all { enabled = false }
+}
