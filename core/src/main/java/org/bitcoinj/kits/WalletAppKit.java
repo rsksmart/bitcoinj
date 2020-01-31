@@ -252,6 +252,19 @@ public class WalletAppKit extends AbstractIdleService {
         return new SPVBlockStore(params, file);
     }
 
+
+    protected boolean chainFileDelete(File chainFile) {
+        return chainFile.delete();
+    }
+
+    protected File getChainFile() {
+        return new File(directory, filePrefix + ".spvchain");
+    }
+
+    protected boolean chainFileExists(File chainFile) {
+        return chainFile.exists();
+    }
+
     /**
      * This method is invoked on a background thread after all objects are initialised, but before the peer group
      * or block chain download is started. You can tweak the objects configuration here.
@@ -266,7 +279,7 @@ public class WalletAppKit extends AbstractIdleService {
     public boolean isChainFileLocked() throws IOException {
         RandomAccessFile file2 = null;
         try {
-            File file = new File(directory, filePrefix + ".spvchain");
+            File file = getChainFile();
             if (!file.exists())
                 return false;
             if (file.isDirectory())
@@ -294,8 +307,8 @@ public class WalletAppKit extends AbstractIdleService {
         }
         log.info("Starting up with directory = {}", directory);
         try {
-            File chainFile = new File(directory, filePrefix + ".spvchain");
-            boolean chainFileExists = chainFile.exists();
+            File chainFile = getChainFile();
+            boolean chainFileExists = chainFileExists(chainFile);
             vWalletFile = new File(directory, filePrefix + ".wallet");
             boolean shouldReplayWallet = (vWalletFile.exists() && !chainFileExists) || restoreFromSeed != null || restoreFromKey != null;
             vWallet = createOrLoadWallet(shouldReplayWallet);
@@ -315,7 +328,7 @@ public class WalletAppKit extends AbstractIdleService {
                         if (chainFileExists) {
                             log.info("Deleting the chain file in preparation from restore.");
                             vStore.close();
-                            if (!chainFile.delete())
+                            if (!chainFileDelete(chainFile))
                                 throw new IOException("Failed to delete chain file in preparation for restore.");
                             vStore = provideBlockStore(chainFile);
                         }
@@ -324,7 +337,7 @@ public class WalletAppKit extends AbstractIdleService {
                         if (chainFileExists) {
                             log.info("Deleting the chain file in preparation from restore.");
                             vStore.close();
-                            if (!chainFile.delete())
+                            if (!chainFileDelete(chainFile))
                                 throw new IOException("Failed to delete chain file in preparation for restore.");
                             vStore = provideBlockStore(chainFile);
                         }
@@ -340,7 +353,7 @@ public class WalletAppKit extends AbstractIdleService {
                 } else if (chainFileExists) {
                     log.info("Deleting the chain file in preparation from restore.");
                     vStore.close();
-                    if (!chainFile.delete())
+                    if (!chainFileDelete(chainFile))
                         throw new IOException("Failed to delete chain file in preparation for restore.");
                     vStore = provideBlockStore(chainFile);
                 }
