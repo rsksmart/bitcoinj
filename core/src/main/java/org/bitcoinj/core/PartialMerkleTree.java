@@ -261,10 +261,10 @@ public class PartialMerkleTree extends Message {
         // Skip input 0 script
         _offset += input0ScriptLength;
 
-        // Check output 0 index
-        long output0Index = Utils.readUint32(leftAndRight, _offset);
+        // Check input 0 sequence
+        long input0Sequence = Utils.readUint32(leftAndRight, _offset);
         _offset += 4;
-        if (output0Index > 1000000 && output0Index != COINBASE_CHECKED){
+        if (input0Sequence > 1000000 && input0Sequence != COINBASE_CHECKED){
             // this value is capped by max btc tx size
             // and should check also is not a valid coinbase expressed in a byte array
             return;
