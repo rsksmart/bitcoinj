@@ -1370,7 +1370,14 @@ public class Peer extends PeerSocketHandler {
                 if (blockChain != null && fastCatchupTimeSecs > blockChain.getChainHead().getHeader().getTimeSeconds())
                     downloadBlockBodies = false;
             }
-            this.useFilteredBlocks = useFilteredBlocks;
+            // TODO: HACK! always get the block regardless if there is a bloom filter or not.
+            // Filtered blocks contain txs serialized without witness data. If the wallet gets to know a
+            // tx by a filtered block announcement, the wallet will store the tx without witness data.
+            // Rsk needs the wallet to store txs with witness data.
+            // On top of that, to create an SPV proof of tx (including witness data) in block inclusion, the
+            // filtered block is useless.
+            // this.useFilteredBlocks = useFilteredBlocks;
+            this.useFilteredBlocks = false;
         } finally {
             lock.unlock();
         }
