@@ -56,7 +56,34 @@ task sourcesJar(type: Jar, dependsOn: classes) {
     from sourceSets.main.allSource
 }
 
+task generatePom(dependsOn: jar) {
+    def jarName = jar.outputs.files.singleFile.name
+    def pomFile = "$libsDir/${jarName.take(jarName.lastIndexOf('.'))}.pom"
+    ext.file = new File(pomFile)
+    doLast {
+        pom {
+            project {
+                groupId project.group
+                artifactId project.name
+                version project.version
+
+                licenses {
+                    license {
+                        name 'GNU General Public License (GPL) version 3.0'
+                        url 'http://www.gnu.org/licenses/gpl-3.0.txt'
+                        distribution 'repo'
+                    }
+                }
+            }
+        }.writeTo(pomFile)
+    }
+}
+
 artifacts {
     archives sourcesJar
     archives javadocJar
+    archives(generatePom.file) {
+        type 'text'
+        builtBy generatePom
+    }
 }
