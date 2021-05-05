@@ -17,6 +17,7 @@
 
 package org.bitcoinj.examples;
 
+import java.time.Instant;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
@@ -68,7 +69,7 @@ public class ExamplePaymentChannelServer implements PaymentChannelServerListener
         // Bring up all the objects we need, create/load a wallet, sync the chain, etc. We override WalletAppKit so we
         // can customize it by adding the extension objects - we have to do this before the wallet file is loaded so
         // the plugin that knows how to parse all the additional data is present during the load.
-        appKit = new WalletAppKit(params, new File("."), "payment_channel_example_server") {
+        appKit = new WalletAppKit(params, new File("."), "payment_channel_example_server", Instant.EPOCH.getEpochSecond()) {
             @Override
             protected List<WalletExtension> provideWalletExtensions() {
                 // The StoredPaymentChannelClientStates object is responsible for, amongst other things, broadcasting

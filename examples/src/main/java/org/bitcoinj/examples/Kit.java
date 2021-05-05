@@ -16,6 +16,7 @@
 
 package org.bitcoinj.examples;
 
+import java.time.Instant;
 import org.bitcoinj.core.*;
 import org.bitcoinj.kits.WalletAppKit;
 import org.bitcoinj.params.TestNet3Params;
@@ -54,7 +55,7 @@ public class Kit {
 
         // Now we initialize a new WalletAppKit. The kit handles all the boilerplate for us and is the easiest way to get everything up and running.
         // Have a look at the WalletAppKit documentation and its source to understand what's happening behind the scenes: https://github.com/bitcoinj/bitcoinj/blob/master/core/src/main/java/org/bitcoinj/kits/WalletAppKit.java
-        WalletAppKit kit = new WalletAppKit(params, new File("."), "walletappkit-example");
+        WalletAppKit kit = new WalletAppKit(params, new File("."), "walletappkit-example", Instant.EPOCH.getEpochSecond());
 
         // In case you want to connect with your local bitcoind tell the kit to connect to localhost.
         // You must do that in reg test mode.

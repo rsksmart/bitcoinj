@@ -16,6 +16,7 @@
 
 package org.bitcoinj.tools;
 
+import java.time.Instant;
 import org.bitcoinj.core.*;
 import org.bitcoinj.core.listeners.PeerConnectedEventListener;
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener;
@@ -47,7 +48,7 @@ public class TestFeeLevel {
         Coin feeRateToTest = Coin.valueOf(Long.parseLong(args[0]));
         System.out.println("Fee rate to test is " + feeRateToTest.toFriendlyString() + "/kB");
 
-        kit = new WalletAppKit(PARAMS, new File("."), "testfeelevel");
+        kit = new WalletAppKit(PARAMS, new File("."), "testfeelevel", Instant.EPOCH.getEpochSecond());
         kit.startAsync();
         kit.awaitRunning();
         try {

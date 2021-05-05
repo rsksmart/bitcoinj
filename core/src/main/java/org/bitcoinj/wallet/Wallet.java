@@ -3512,14 +3512,19 @@ public class Wallet extends BaseTaggableObject
      */
     @Override
     public long getEarliestKeyCreationTime() {
+        return getEarliestKeyCreationTime(Utils.currentTimeSeconds());
+    }
+
+    @Override
+    public long getEarliestKeyCreationTime(long earliestAcceptedTime) {
         keyChainGroupLock.lock();
         try {
             long earliestTime = keyChainGroup.getEarliestKeyCreationTime();
             for (Script script : watchedScripts)
                 earliestTime = Math.min(script.getCreationTimeSeconds(), earliestTime);
             if (earliestTime == Long.MAX_VALUE)
-                return Utils.currentTimeSeconds();
-            return earliestTime;
+                return earliestAcceptedTime;
+            return Math.min(earliestTime, Utils.currentTimeSeconds());
         } finally {
             keyChainGroupLock.unlock();
         }

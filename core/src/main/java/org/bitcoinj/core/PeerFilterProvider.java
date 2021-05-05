@@ -31,6 +31,14 @@ public interface PeerFilterProvider {
     long getEarliestKeyCreationTime();
 
     /**
+     * Returns the earliest timestamp (seconds since epoch) for which full/bloom-filtered blocks must be downloaded.
+     * Blocks with timestamps before this time will only have headers downloaded. 0 requires that all blocks be
+     * downloaded, and thus this should default to {@link System#currentTimeMillis()}/1000.
+     * earliestAcceptedTime: specifies the earliest time to be returned
+     */
+    long getEarliestKeyCreationTime(long earliestAcceptedTime);
+
+    /**
      * Called on all registered filter providers before getBloomFilterElementCount and getBloomFilter are called.
      * Once called, the provider should ensure that the items it will want to insert into the filter don't change.
      * The reason is that all providers will have their element counts queried, and then a filter big enough for
