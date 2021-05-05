@@ -68,6 +68,7 @@ public class WalletAppKit extends AbstractIdleService {
     protected final Script.ScriptType preferredOutputScriptType;
     protected final KeyChainGroupStructure structure;
     protected final String filePrefix;
+    protected final long walletCreationTime;
     protected volatile BlockChain vChain;
     protected volatile BlockStore vStore;
     protected volatile Wallet vWallet;
@@ -93,29 +94,42 @@ public class WalletAppKit extends AbstractIdleService {
     /**
      * Creates a new WalletAppKit, with a newly created {@link Context}. Files will be stored in the given directory.
      */
-    public WalletAppKit(NetworkParameters params, File directory, String filePrefix) {
-        this(new Context(params), Script.ScriptType.P2PKH, null, directory, filePrefix);
+    public WalletAppKit(NetworkParameters params, File directory, String filePrefix, long walletCreationTime) {
+        this(new Context(params), Script.ScriptType.P2PKH, null, directory, filePrefix, walletCreationTime);
     }
 
     /**
      * Creates a new WalletAppKit, with a newly created {@link Context}. Files will be stored in the given directory.
      */
-    public WalletAppKit(NetworkParameters params, Script.ScriptType preferredOutputScriptType,
-            @Nullable KeyChainGroupStructure structure, File directory, String filePrefix) {
-        this(new Context(params), preferredOutputScriptType, structure, directory, filePrefix);
+    public WalletAppKit(
+        NetworkParameters params,
+        Script.ScriptType preferredOutputScriptType,
+        @Nullable KeyChainGroupStructure structure,
+        File directory,
+        String filePrefix,
+        long walletCreationTime
+    ) {
+        this(new Context(params), preferredOutputScriptType, structure, directory, filePrefix, walletCreationTime);
     }
 
     /**
      * Creates a new WalletAppKit, with the given {@link Context}. Files will be stored in the given directory.
      */
-    public WalletAppKit(Context context, Script.ScriptType preferredOutputScriptType,
-            @Nullable KeyChainGroupStructure structure, File directory, String filePrefix) {
+    public WalletAppKit(
+        Context context,
+        Script.ScriptType preferredOutputScriptType,
+        @Nullable KeyChainGroupStructure structure,
+        File directory,
+        String filePrefix,
+        long walletCreationTime
+    ) {
         this.context = context;
         this.params = checkNotNull(context.getParams());
         this.preferredOutputScriptType = checkNotNull(preferredOutputScriptType);
         this.structure = structure != null ? structure : KeyChainGroupStructure.DEFAULT;
         this.directory = checkNotNull(directory);
         this.filePrefix = checkNotNull(filePrefix);
+        this.walletCreationTime = walletCreationTime;
     }
 
     /** Will only connect to the given addresses. Cannot be called after startup. */
@@ -344,7 +358,7 @@ public class WalletAppKit extends AbstractIdleService {
                     }
                     else
                     {
-                        time = vWallet.getEarliestKeyCreationTime();
+                        time = vWallet.getEarliestKeyCreationTime(this.walletCreationTime);
                     }
                     if (time > 0)
                         CheckpointManager.checkpoint(params, checkpoints, vStore, time);

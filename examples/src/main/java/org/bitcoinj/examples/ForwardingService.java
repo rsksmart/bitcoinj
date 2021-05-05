@@ -17,6 +17,7 @@
 
 package org.bitcoinj.examples;
 
+import java.time.Instant;
 import org.bitcoinj.core.Address;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.InsufficientMoneyException;
@@ -78,7 +79,7 @@ public class ForwardingService {
         System.out.println("Forwarding address: " + forwardingAddress);
 
         // Start up a basic app using a class that automates some boilerplate.
-        kit = new WalletAppKit(params, new File("."), filePrefix);
+        kit = new WalletAppKit(params, new File("."), filePrefix, Instant.EPOCH.getEpochSecond());
 
         if (params == RegTestParams.get()) {
             // Regression test mode is designed for testing and development only, so there's no public network for it.

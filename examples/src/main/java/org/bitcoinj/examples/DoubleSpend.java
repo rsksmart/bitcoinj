@@ -16,6 +16,7 @@
 
 package org.bitcoinj.examples;
 
+import java.time.Instant;
 import org.bitcoinj.core.listeners.PreMessageReceivedEventListener;
 import org.bitcoinj.core.*;
 import org.bitcoinj.kits.WalletAppKit;
@@ -37,7 +38,7 @@ public class DoubleSpend {
     public static void main(String[] args) throws Exception {
         BriefLogFormatter.init();
         final RegTestParams params = RegTestParams.get();
-        WalletAppKit kit = new WalletAppKit(params, new File("."), "doublespend");
+        WalletAppKit kit = new WalletAppKit(params, new File("."), "doublespend", Instant.EPOCH.getEpochSecond());
         kit.connectToLocalHost();
         kit.setAutoSave(false);
         kit.startAsync();
