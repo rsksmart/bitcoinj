@@ -3524,7 +3524,7 @@ public class Wallet extends BaseTaggableObject
                 earliestTime = Math.min(script.getCreationTimeSeconds(), earliestTime);
             if (earliestTime == Long.MAX_VALUE)
                 return earliestAcceptedTime;
-            return Math.min(earliestTime, Utils.currentTimeSeconds());
+            return Math.min(Math.min(earliestTime, Utils.currentTimeSeconds()), earliestAcceptedTime);
         } finally {
             keyChainGroupLock.unlock();
         }
