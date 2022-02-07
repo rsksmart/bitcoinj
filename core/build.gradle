@@ -2,12 +2,14 @@ apply plugin: 'java'
 apply plugin: 'com.google.protobuf'
 apply plugin: 'maven'
 apply plugin: 'eclipse'
+apply plugin: 'maven-publish'
 
-version = '0.15.6-rsk-2'
+version = '0.15.6-rsk-3'
 archivesBaseName = 'bitcoinj-core'
 eclipse.project.name = 'bitcoinj-core'
 
 dependencies {
+    compile 'co.rsk:native:1.2.1'
     compile 'org.bouncycastle:bcprov-jdk15to18:1.63'
     implementation 'com.google.guava:guava:28.1-android'
     compile 'com.google.protobuf:protobuf-java:3.6.1'
@@ -76,6 +78,23 @@ task generatePom(dependsOn: jar) {
                 }
             }
         }.writeTo(pomFile)
+    }
+}
+
+publishing {
+    publications {
+        bitcoinj(MavenPublication) {
+            pom {
+                from components.java
+                licenses {
+                    license {
+                        name = 'GNU General Public License (GPL) version 3.0'
+                        url = 'http://www.gnu.org/licenses/gpl-3.0.txt'
+                        distribution = 'repo'
+                    }
+                }
+            }
+        }
     }
 }
 
