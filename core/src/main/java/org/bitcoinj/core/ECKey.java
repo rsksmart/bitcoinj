@@ -760,7 +760,12 @@ public class ECKey implements EncryptableItem {
      */
     public static boolean verify(byte[] data, byte[] signature, byte[] pub) throws SignatureDecodeException {
         if (Secp256k1Context.isEnabled()) {
-            return NativeSecp256k1.verify(data, signature, pub);
+            try {
+                return NativeSecp256k1.verify(data, signature, pub);
+            } catch (Exception e) {
+                log.error("Caught Exception inside secp256k1", e);
+                return false;
+            }
         }
         return verify(data, ECDSASignature.decodeFromDER(signature), pub);
     }
