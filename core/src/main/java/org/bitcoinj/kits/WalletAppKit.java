@@ -322,24 +322,36 @@ public class WalletAppKit extends AbstractIdleService {
         log.info("Starting up with directory = {}", directory);
         try {
             File chainFile = getChainFile();
+            log.debug("chainFile = {}", chainFile);
             boolean chainFileExists = chainFileExists(chainFile);
+            log.debug("chainFileExists = {}", chainFileExists);
             vWalletFile = new File(directory, filePrefix + ".wallet");
+            log.debug("vWalletFile = {}", vWalletFile);
             boolean shouldReplayWallet = (vWalletFile.exists() && !chainFileExists) || restoreFromSeed != null || restoreFromKey != null;
+            log.debug("shouldReplayWallet = {}", shouldReplayWallet);
             vWallet = createOrLoadWallet(shouldReplayWallet);
+            log.debug("vWallet = {}", vWallet);
 
             // Initiate Bitcoin network objects (block store, blockchain and peer group)
             vStore = provideBlockStore(chainFile);
+            log.debug("vStore = {}", vStore);
             if (!chainFileExists || restoreFromSeed != null || restoreFromKey != null) {
+                log.debug("chainFileExists = {}, restoreFromSeed = {}, restoreFromKey = {}", chainFileExists, restoreFromSeed, restoreFromKey);
                 if (checkpoints == null && !Utils.isAndroidRuntime()) {
+                    log.debug("checkpoints = {}", checkpoints);
                     checkpoints = CheckpointManager.openStream(params);
                 }
 
                 if (checkpoints != null) {
+                    log.debug("checkpoints = {}", checkpoints);
                     // Initialize the chain file with a checkpoint to speed up first-run sync.
                     long time;
                     if (restoreFromSeed != null) {
+                        log.debug("restoreFromSeed = {}", restoreFromSeed);
                         time = restoreFromSeed.getCreationTimeSeconds();
+                        log.debug("time = {}", time);
                         if (chainFileExists) {
+                            log.debug("chainFileExists = {}", chainFileExists);
                             log.info("Deleting the chain file in preparation from restore.");
                             vStore.close();
                             if (!chainFileDelete(chainFile))
@@ -347,7 +359,9 @@ public class WalletAppKit extends AbstractIdleService {
                             vStore = provideBlockStore(chainFile);
                         }
                     } else if (restoreFromKey != null) {
+                        log.debug("restoreFromKey = {}", restoreFromKey);
                         time = restoreFromKey.getCreationTimeSeconds();
+                        log.debug("time = {}", time);
                         if (chainFileExists) {
                             log.info("Deleting the chain file in preparation from restore.");
                             vStore.close();
@@ -358,9 +372,11 @@ public class WalletAppKit extends AbstractIdleService {
                     }
                     else
                     {
+                        log.debug("vWallet.getEarliestKeyCreationTime(this.walletCreationTime) = {}", vWallet.getEarliestKeyCreationTime(this.walletCreationTime));
                         time = vWallet.getEarliestKeyCreationTime(this.walletCreationTime);
                     }
                     if (time > 0) {
+                        log.debug("time = {}", time);
                         CheckpointManager.checkpoint(params, checkpoints, vStore, time);
                         log.warn(
                             "Starting from checkpoint. Block[{}] = {}",
@@ -379,50 +395,68 @@ public class WalletAppKit extends AbstractIdleService {
                 }
             }
             vChain = new BlockChain(params, vStore);
+            log.debug("vChain = {}", vChain);
             vPeerGroup = createPeerGroup();
+            log.debug("vPeerGroup = {}", vPeerGroup);
             if (this.userAgent != null)
                 vPeerGroup.setUserAgent(userAgent, version);
 
             // Set up peer addresses or discovery first, so if wallet extensions try to broadcast a transaction
             // before we're actually connected the broadcast waits for an appropriate number of connections.
             if (peerAddresses != null) {
+                log.debug("peerAddresses = {}", peerAddresses);
                 for (PeerAddress addr : peerAddresses) vPeerGroup.addAddress(addr);
                 vPeerGroup.setMaxConnections(peerAddresses.length);
                 peerAddresses = null;
             } else if (!params.getId().equals(NetworkParameters.ID_REGTEST)) {
+                log.debug("discovery = {}", discovery);
                 vPeerGroup.addPeerDiscovery(discovery != null ? discovery : new DnsDiscovery(params));
             }
             vChain.addWallet(vWallet);
+            log.debug("added wallet to chain {}", vWallet);
             vPeerGroup.addWallet(vWallet);
+            log.debug("added wallet to peer group {}", vWallet);
             onSetupCompleted();
+            log.debug("onSetupCompleted() completed");
 
             if (blockingStartup) {
+                log.debug("blockingStartup = {}", blockingStartup);
                 vPeerGroup.start();
+                log.debug("vPeerGroup started");
                 // Make sure we shut down cleanly.
                 installShutdownHook();
+                log.debug("installShutdownHook() completed");
                 completeExtensionInitiations(vPeerGroup);
+                log.debug("completeExtensionInitiations() completed");
 
                 // TODO: Be able to use the provided download listener when doing a blocking startup.
                 final DownloadProgressTracker listener = new DownloadProgressTracker();
                 vPeerGroup.startBlockChainDownload(listener);
+                log.debug("vPeerGroup.startBlockChainDownload(listener) completed");
                 listener.await();
+                log.debug("listener.await() completed");
             } else {
+                log.debug("blockingStartup = {}", blockingStartup);
                 Futures.addCallback(vPeerGroup.startAsync(), new FutureCallback() {
                     @Override
                     public void onSuccess(@Nullable Object result) {
                         completeExtensionInitiations(vPeerGroup);
+                        log.debug("completeExtensionInitiations() completed");
                         final DownloadProgressTracker l = downloadListener == null ? new DownloadProgressTracker() : downloadListener;
                         vPeerGroup.startBlockChainDownload(l);
+                        log.debug("vPeerGroup.startBlockChainDownload(l) completed");
                     }
 
                     @Override
                     public void onFailure(Throwable t) {
+                        log.debug("onFailure() called");
                         throw new RuntimeException(t);
 
                     }
                 }, MoreExecutors.directExecutor());
             }
         } catch (BlockStoreException e) {
+            log.debug("BlockStoreException: {}", e);
             throw new IOException(e);
         }
     }
