@@ -16,6 +16,7 @@
 
 package org.bitcoinj.store;
 
+import java.math.BigInteger;
 import org.bitcoinj.core.*;
 import org.fusesource.leveldbjni.*;
 import org.iq80.leveldb.*;
@@ -35,7 +36,11 @@ public class LevelDBBlockStore implements BlockStore {
 
     private final Context context;
     private DB db;
-    private final ByteBuffer buffer = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE);
+
+    private static final BigInteger MAX_WORK_V1 = new BigInteger(/* 12 bytes */ "ffffffffffffffffffffffff", 16);
+    private final ByteBuffer bufferV1 = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE);
+    private final ByteBuffer bufferV2 = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE_V2);
+
     private final File path;
 
     /** Creates a LevelDB SPV block store using the JNI/C++ version of LevelDB. */
@@ -78,9 +83,24 @@ public class LevelDBBlockStore implements BlockStore {
 
     @Override
     public synchronized void put(StoredBlock block) throws BlockStoreException {
-        buffer.clear();
-        block.serializeCompact(buffer);
+        ByteBuffer buffer = serializeBlock(block);
         db.put(block.getHeader().getHash().getBytes(), buffer.array());
+    }
+
+    private ByteBuffer serializeBlock(StoredBlock block) {
+        clearBuffer();
+        if (block.getChainWork().compareTo(MAX_WORK_V1) <= 0) {
+            block.serializeCompact(bufferV1);
+            return bufferV1;
+        } else {
+            block.serializeCompactV2(bufferV2);
+            return bufferV2;
+        }
+    }
+
+    private void clearBuffer() {
+        bufferV1.clear();
+        bufferV2.clear();
     }
 
     @Override @Nullable
@@ -88,7 +108,18 @@ public class LevelDBBlockStore implements BlockStore {
         byte[] bits = db.get(hash.getBytes());
         if (bits == null)
             return null;
-        return StoredBlock.deserializeCompact(context.getParams(), ByteBuffer.wrap(bits));
+        return deserializeCompact(ByteBuffer.wrap(bits));
+    }
+
+    private StoredBlock deserializeCompact(ByteBuffer buffer) {
+        NetworkParameters params = context.getParams();
+        byte[] bytes = buffer.array();
+        if (bytes.length == StoredBlock.COMPACT_SERIALIZED_SIZE)
+            return StoredBlock.deserializeCompact(params, buffer);
+        else if (bytes.length == StoredBlock.COMPACT_SERIALIZED_SIZE_V2)
+            return StoredBlock.deserializeCompactV2(params, buffer);
+        else
+            throw new IllegalStateException("unexpected length of checkpoint: " + bytes.length);
     }
 
     @Override

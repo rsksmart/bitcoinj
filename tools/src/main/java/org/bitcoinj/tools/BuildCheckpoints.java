@@ -17,6 +17,7 @@
 
 package org.bitcoinj.tools;
 
+import java.math.BigInteger;
 import org.bitcoinj.core.listeners.NewBestBlockListener;
 import org.bitcoinj.core.*;
 import org.bitcoinj.net.discovery.DnsDiscovery;
@@ -32,7 +33,6 @@ import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
 
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -43,8 +43,6 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.DigestOutputStream;
-import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.Future;
 
@@ -156,58 +154,42 @@ public class BuildCheckpoints {
 
         checkState(checkpoints.size() > 0);
 
-        final File plainFile = new File("checkpoints" + suffix);
         final File textFile = new File("checkpoints" + suffix + ".txt");
 
         // Write checkpoint data out.
-        writeBinaryCheckpoints(checkpoints, plainFile);
         writeTextualCheckpoints(checkpoints, textFile);
 
         peerGroup.stop();
         store.close();
 
         // Sanity check the created files.
-        sanityCheck(plainFile, checkpoints.size());
         sanityCheck(textFile, checkpoints.size());
     }
 
-    private static void writeBinaryCheckpoints(TreeMap<Integer, StoredBlock> checkpoints, File file) throws Exception {
-        final FileOutputStream fileOutputStream = new FileOutputStream(file, false);
-        MessageDigest digest = Sha256Hash.newDigest();
-        final DigestOutputStream digestOutputStream = new DigestOutputStream(fileOutputStream, digest);
-        digestOutputStream.on(false);
-        final DataOutputStream dataOutputStream = new DataOutputStream(digestOutputStream);
-        dataOutputStream.writeBytes("CHECKPOINTS 1");
-        dataOutputStream.writeInt(0);  // Number of signatures to read. Do this later.
-        digestOutputStream.on(true);
-        dataOutputStream.writeInt(checkpoints.size());
-        ByteBuffer buffer = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE);
-        for (StoredBlock block : checkpoints.values()) {
-            block.serializeCompact(buffer);
-            dataOutputStream.write(buffer.array());
-            buffer.position(0);
-        }
-        dataOutputStream.close();
-        Sha256Hash checkpointsHash = Sha256Hash.wrap(digest.digest());
-        System.out.println("Hash of checkpoints data is " + checkpointsHash);
-        digestOutputStream.close();
-        fileOutputStream.close();
-        System.out.println("Checkpoints written to '" + file.getCanonicalPath() + "'.");
-    }
+    private static final BigInteger MAX_WORK_V1 = new BigInteger(/* 12 bytes */ "ffffffffffffffffffffffff", 16);
 
-    private static void writeTextualCheckpoints(TreeMap<Integer, StoredBlock> checkpoints, File file) throws IOException {
-        PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.US_ASCII));
-        writer.println("TXT CHECKPOINTS 1");
-        writer.println("0"); // Number of signatures to read. Do this later.
-        writer.println(checkpoints.size());
-        ByteBuffer buffer = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE);
-        for (StoredBlock block : checkpoints.values()) {
-            block.serializeCompact(buffer);
-            writer.println(CheckpointManager.BASE64.encode(buffer.array()));
-            buffer.position(0);
+    private static void writeTextualCheckpoints(TreeMap<Integer, StoredBlock> checkpoints, File file)
+        throws IOException {
+        try (PrintWriter writer = new PrintWriter(
+            new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.US_ASCII))) {
+            writer.println("TXT CHECKPOINTS 1");
+            writer.println("0"); // Number of signatures to read. Do this later.
+            writer.println(checkpoints.size());
+            ByteBuffer bufferV1 = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE);
+            ByteBuffer bufferV2 = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE_V2);
+            for (StoredBlock block : checkpoints.values()) {
+                if (block.getChainWork().compareTo(MAX_WORK_V1) <= 0) {
+                    bufferV1.rewind();
+                    block.serializeCompact(bufferV1);
+                    writer.println(CheckpointManager.BASE64.encode(bufferV1.array()));
+                } else {
+                    bufferV2.rewind();
+                    block.serializeCompactV2(bufferV2);
+                    writer.println(CheckpointManager.BASE64.encode(bufferV2.array()));
+                }
+            }
+            System.out.println("Checkpoints written to '" + file.getCanonicalPath() + "'.");
         }
-        writer.close();
-        System.out.println("Checkpoints written to '" + file.getCanonicalPath() + "'.");
     }
 
     private static void sanityCheck(File file, int expectedSize) throws IOException {

@@ -17,16 +17,23 @@
 
 package org.bitcoinj.store;
 
+import static org.bitcoinj.core.Utils.isWindows;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
+import java.io.RandomAccessFile;
 import java.math.BigInteger;
+import java.nio.Buffer;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 import org.bitcoinj.core.Address;
 import org.bitcoinj.core.Block;
+import org.bitcoinj.core.Context;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.LegacyAddress;
 import org.bitcoinj.core.NetworkParameters;
@@ -34,6 +41,7 @@ import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.StoredBlock;
 import org.bitcoinj.core.Transaction;
 import org.bitcoinj.params.UnitTestParams;
+import org.bitcoinj.script.Script.ScriptType;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -144,6 +152,66 @@ public class SPVBlockStoreTest {
         }
         assertTrue("took " + watch + " for " + ITERATIONS + " iterations",
                 watch.elapsed(TimeUnit.MILLISECONDS) < THRESHOLD_MS);
+        store.close();
+    }
+
+    @Test
+    public void clear() throws Exception {
+        Context.propagate(new Context(UNITTEST, 100, Transaction.DEFAULT_TX_FEE, false));
+        SPVBlockStore store = new SPVBlockStore(UNITTEST, blockStoreFile);
+
+        ;
+        // Build a new block.
+        Address to = Address.fromKey(UNITTEST, new ECKey(), ScriptType.P2PKH);
+        StoredBlock genesis = store.getChainHead();
+        StoredBlock b1 = genesis.build(genesis.getHeader().createNextBlock(to).cloneAsHeader());
+        store.put(b1);
+        store.setChainHead(b1);
+        assertEquals(b1.getHeader().getHash(), store.getChainHead().getHeader().getHash());
+        store.clear();
+        assertNull(store.get(b1.getHeader().getHash()));
+        assertEquals(UNITTEST.getGenesisBlock().getHash(), store.getChainHead().getHeader().getHash());
+        store.close();
+    }
+
+    @Test
+    public void oneStoreDelete() throws Exception {
+        SPVBlockStore store = new SPVBlockStore(UNITTEST, blockStoreFile);
+        store.close();
+        boolean deleted = blockStoreFile.delete();
+        if (!isWindows()) {
+            // TODO: Deletion is failing on Windows
+            assertTrue(deleted);
+        }
+    }
+
+    @Test
+    public void migrateV1toV2() throws Exception {
+        // create V1 format
+        RandomAccessFile raf = new RandomAccessFile(blockStoreFile, "rw");
+        FileChannel channel = raf.getChannel();
+        ByteBuffer buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0,
+            SPVBlockStore.FILE_PROLOGUE_BYTES + SPVBlockStore.RECORD_SIZE_V1 * 3);
+        buffer.put(SPVBlockStore.HEADER_MAGIC_V1); // header magic
+        Block genesisBlock = UNITTEST.getGenesisBlock();
+        StoredBlock storedGenesisBlock = new StoredBlock(genesisBlock.cloneAsHeader(), genesisBlock.getWork(), 0);
+        Sha256Hash genesisHash = storedGenesisBlock.getHeader().getHash();
+        ((Buffer) buffer).position(SPVBlockStore.FILE_PROLOGUE_BYTES);
+        buffer.put(genesisHash.getBytes());
+        storedGenesisBlock.serializeCompact(buffer);
+        buffer.putInt(4, buffer.position()); // ring cursor
+        ((Buffer) buffer).position(8);
+        buffer.put(genesisHash.getBytes()); // chain head
+        raf.close();
+
+        // migrate to V2 format
+        SPVBlockStore store = new SPVBlockStore(UNITTEST, blockStoreFile);
+
+        // check block is the same
+        assertEquals(genesisHash, store.getChainHead().getHeader().getHash());
+        // check ring cursor
+        assertEquals(SPVBlockStore.FILE_PROLOGUE_BYTES + SPVBlockStore.RECORD_SIZE_V2 * 1,
+            store.getRingCursor());
         store.close();
     }
 }
