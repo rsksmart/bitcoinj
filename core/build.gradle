@@ -1,3 +1,7 @@
+plugins {
+    id 'maven-publish'
+}
+
 apply plugin: 'java'
 apply plugin: 'com.google.protobuf'
 apply plugin: 'maven'
@@ -85,5 +89,16 @@ artifacts {
     archives(generatePom.file) {
         type 'text'
         builtBy generatePom
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            groupId = 'org.bitcoinj'// Replace with your group ID
+            artifactId = 'core' // Replace with your artifact ID
+            version = '0.15.6-rsk-4-SNAPSHOT' // Replace with your version
+        }
     }
 }
