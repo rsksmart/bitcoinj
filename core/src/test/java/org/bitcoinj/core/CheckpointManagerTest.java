@@ -141,7 +141,7 @@ public class CheckpointManagerTest {
             buffer.flip();
             StoredBlock block;
             if (blockFormatSize == StoredBlock.COMPACT_SERIALIZED_SIZE) {
-                block = StoredBlock.deserializeCompact(MAINNET, buffer);
+                block = StoredBlock.deserializeCompactLegacy(MAINNET, buffer);
             } else {
                 block = StoredBlock.deserializeCompactV2(MAINNET, buffer);
             }
@@ -154,7 +154,7 @@ public class CheckpointManagerTest {
         throws IOException {
         buffer.rewind();
         if (isV1) {
-            block.serializeCompact(buffer);
+            block.serializeCompactLegacy(buffer);
         } else {
             block.serializeCompactV2(buffer);
         }
