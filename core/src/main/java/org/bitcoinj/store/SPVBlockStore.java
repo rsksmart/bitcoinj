@@ -233,7 +233,7 @@ public class SPVBlockStore implements BlockStore {
                 buffer.get(scratch);
                 if (Arrays.equals(scratch, targetHashBytes)) {
                     // Found the target.
-                    StoredBlock storedBlock = StoredBlock.deserializeCompact(params, buffer);
+                    StoredBlock storedBlock = StoredBlock.deserializeCompactLegacy(params, buffer);
                     blockCache.put(hash, storedBlock);
                     return storedBlock;
                 }

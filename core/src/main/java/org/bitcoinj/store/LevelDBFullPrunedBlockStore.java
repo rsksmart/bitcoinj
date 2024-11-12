@@ -640,7 +640,7 @@ public class LevelDBFullPrunedBlockStore implements FullPrunedBlockStore {
         }
         // TODO Should I chop the last byte off? Seems to work with it left
         // there...
-        StoredBlock stored = StoredBlock.deserializeCompact(params, ByteBuffer.wrap(result));
+        StoredBlock stored = StoredBlock.deserializeCompactLegacy(params, ByteBuffer.wrap(result));
         stored.getHeader().verifyHeader();
 
         if (instrument)

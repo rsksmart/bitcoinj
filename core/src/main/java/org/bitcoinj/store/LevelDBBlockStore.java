@@ -88,7 +88,7 @@ public class LevelDBBlockStore implements BlockStore {
         byte[] bits = db.get(hash.getBytes());
         if (bits == null)
             return null;
-        return StoredBlock.deserializeCompact(context.getParams(), ByteBuffer.wrap(bits));
+        return StoredBlock.deserializeCompactLegacy(context.getParams(), ByteBuffer.wrap(bits));
     }
 
     @Override
