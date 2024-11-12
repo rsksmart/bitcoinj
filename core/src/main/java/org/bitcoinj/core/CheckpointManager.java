@@ -145,6 +145,17 @@ public class CheckpointManager {
                 buffer.position(0);
                 checkpoints.put(block.getHeader().getTimeSeconds(), block);
             }
+
+            int actualCheckpointsSize = dis.available();
+            int expectedCheckpointsSize = numCheckpoints * size;
+            // Check if there are any bytes left in the stream. If it does, it means that checkpoints are malformed
+            if (dis.available() > 0) {
+                String message = String.format(
+                    "Checkpoints size did not match size for version 1 format. Expected checkpoints %d with size of %d bytes, but actual size was %d.",
+                    numCheckpoints, expectedCheckpointsSize, actualCheckpointsSize);
+                throw new IOException(message);
+            }
+
             Sha256Hash dataHash = Sha256Hash.wrap(digest.digest());
             log.info("Read {} checkpoints up to time {}, hash is {}", checkpoints.size(),
                     Utils.dateTimeFormat(checkpoints.lastEntry().getKey() * 1000), dataHash);

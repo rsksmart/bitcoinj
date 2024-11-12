@@ -149,7 +149,7 @@ public class StoredBlockTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void serializeCompactV2_forMoreThan32bytesChainWork_throwsException() {
-        StoredBlock blockToStore = new StoredBlock(block, TOO_LARGE_WORK_V2, blockHeight);
+        StoredBlock  blockToStore = new StoredBlock(block, TOO_LARGE_WORK_V2, blockHeight);
 
         // serialize block should throw illegal argument exception
         blockToStore.serializeCompactV2(blockBuffer);
