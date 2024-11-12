@@ -196,7 +196,7 @@ public class SPVBlockStore implements BlockStore {
             Sha256Hash hash = block.getHeader().getHash();
             notFoundCache.remove(hash);
             buffer.put(hash.getBytes());
-            block.serializeCompact(buffer);
+            block.serializeCompactLegacy(buffer);
             setRingCursor(buffer, buffer.position());
             blockCache.put(hash, block);
         } finally { lock.unlock(); }

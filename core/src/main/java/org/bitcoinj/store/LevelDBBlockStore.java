@@ -79,7 +79,7 @@ public class LevelDBBlockStore implements BlockStore {
     @Override
     public synchronized void put(StoredBlock block) throws BlockStoreException {
         buffer.clear();
-        block.serializeCompact(buffer);
+        block.serializeCompactLegacy(buffer);
         db.put(block.getHeader().getHash().getBytes(), buffer.array());
     }
 

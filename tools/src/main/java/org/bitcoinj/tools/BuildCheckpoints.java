@@ -183,7 +183,7 @@ public class BuildCheckpoints {
         dataOutputStream.writeInt(checkpoints.size());
         ByteBuffer buffer = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE);
         for (StoredBlock block : checkpoints.values()) {
-            block.serializeCompact(buffer);
+            block.serializeCompactLegacy(buffer);
             dataOutputStream.write(buffer.array());
             buffer.position(0);
         }
@@ -202,7 +202,7 @@ public class BuildCheckpoints {
         writer.println(checkpoints.size());
         ByteBuffer buffer = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE);
         for (StoredBlock block : checkpoints.values()) {
-            block.serializeCompact(buffer);
+            block.serializeCompactLegacy(buffer);
             writer.println(CheckpointManager.BASE64.encode(buffer.array()));
             buffer.position(0);
         }
