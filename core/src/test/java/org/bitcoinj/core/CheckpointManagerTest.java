@@ -26,19 +26,13 @@ import java.security.DigestOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.easymock.EasyMockRunner;
-import org.easymock.Mock;
 import org.junit.Assert;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 
 import java.io.IOException;
 
 import static org.bitcoinj.core.CheckpointManager.BASE64;
-import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.replay;
 
-@RunWith(EasyMockRunner.class)
 public class CheckpointManagerTest {
 
     private static final NetworkParameters MAINNET = NetworkParameters.fromID(
@@ -65,41 +59,6 @@ public class CheckpointManagerTest {
         "//////////////////////////////////////////8AACdgAQAAAAnfZFAmRFbc2clq5XzNV2/UbKPLCAB7JOECcDoAAAAAeCpL87HF9/JFao8VX1rqRU/pMsv8F08X8ieq464NqECaBsNP//8AHRvpMAo",
         "//////////////////////////////////////////8AAC9AAQAAAMipH0cUa3D2Ea/T7sCMt0G4Tuqq5/b/KugBHgYAAAAAIROhXYS8rkGyrLjTJvp2iWRfTDOcu/Rkkf9Az5xpTLjrB8NPwP8/HGbjgbo"
     );
-
-    @Mock
-    NetworkParameters params;
-
-    @Test(expected = NullPointerException.class)
-    public void shouldThrowNullPointerExceptionWhenCheckpointsNotFound() throws IOException {
-        expect(params.getId()).andReturn("org/bitcoinj/core/checkpointmanagertest/notFound");
-        replay(params);
-        new CheckpointManager(params, null);
-    }
-
-    @Test(expected = IOException.class)
-    public void shouldThrowNullPointerExceptionWhenCheckpointsInUnknownFormat() throws IOException {
-        expect(params.getId()).andReturn("org/bitcoinj/core/checkpointmanagertest/unsupportedFormat");
-        replay(params);
-        new CheckpointManager(params, null);
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void shouldThrowIllegalStateExceptionWithNoCheckpoints() throws IOException {
-        expect(params.getId()).andReturn("org/bitcoinj/core/checkpointmanagertest/noCheckpoints");
-        replay(params);
-        new CheckpointManager(params, null);
-    }
-
-    @Test
-    public void canReadTextualStream() throws IOException {
-        expect(params.getId()).andReturn("org/bitcoinj/core/checkpointmanagertest/validTextualFormat");
-        expect(params.getSerializer(false)).andReturn(
-                new BitcoinSerializer(params, false));
-        expect(params.getProtocolVersionNum(NetworkParameters.ProtocolVersion.CURRENT))
-                .andReturn(NetworkParameters.ProtocolVersion.CURRENT.getBitcoinProtocolVersion());
-        replay(params);
-        new CheckpointManager(params, null);
-    }
 
     @Test
     public void readBinaryCheckpoint_whenTestnet_ok() throws IOException {
@@ -220,5 +179,41 @@ public class CheckpointManagerTest {
 
             Assert.assertNotEquals(checkpointsV2Format, actualCheckpoints);
         }
+    }
+
+    @Test(expected = NullPointerException.class)
+    public void shouldThrowNullPointerExceptionWhenCheckpointsNotFound() throws IOException {
+        InputStream checkpointStream = getClass().getResourceAsStream("/org/bitcoinj/core/checkpointmanagertest/notFound.checkpoints.txt");
+        new CheckpointManager(null, checkpointStream);
+    }
+
+    @Test(expected = IOException.class)
+    public void shouldThrowNullPointerExceptionWhenCheckpointsInUnknownFormat() throws IOException {
+        InputStream checkpointStream = getClass().getResourceAsStream("/org/bitcoinj/core/checkpointmanagertest/unsupportedFormat.checkpoints.txt");
+        new CheckpointManager(MAINNET, checkpointStream);
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void shouldThrowIllegalStateExceptionWithNoCheckpoints() throws IOException {
+        InputStream checkpointStream = getClass().getResourceAsStream("/org/bitcoinj/core/checkpointmanagertest/noCheckpoints.checkpoints.txt");
+        new CheckpointManager(MAINNET, checkpointStream);
+    }
+
+    @Test
+    public void canReadTextualFormat() throws IOException {
+        InputStream checkpointStream = getClass().getResourceAsStream("/org/bitcoinj/core/checkpointmanagertest/validTextualFormat.checkpoints.txt");
+        CheckpointManager checkpointManager = new CheckpointManager(MAINNET, checkpointStream);
+
+        List<StoredBlock> actualCheckpoints = new ArrayList<>(checkpointManager.checkpoints.values());
+        Assert.assertEquals(6, actualCheckpoints.size());
+    }
+
+    @Test
+    public void canReadTextualMixFormats() throws IOException {
+        InputStream checkpointStream = getClass().getResourceAsStream("/org/bitcoinj/core/checkpointmanagertest/mixFormats.checkpoints.txt");
+        CheckpointManager checkpointManager = new CheckpointManager(MAINNET, checkpointStream);
+
+        List<StoredBlock> actualCheckpoints = new ArrayList<>(checkpointManager.checkpoints.values());
+        Assert.assertEquals(6, actualCheckpoints.size());
     }
 }
