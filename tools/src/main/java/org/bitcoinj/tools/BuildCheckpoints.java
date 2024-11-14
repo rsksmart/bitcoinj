@@ -17,6 +17,8 @@
 
 package org.bitcoinj.tools;
 
+import java.math.BigInteger;
+import java.nio.file.Files;
 import org.bitcoinj.core.listeners.NewBestBlockListener;
 import org.bitcoinj.core.*;
 import org.bitcoinj.net.discovery.DnsDiscovery;
@@ -165,16 +167,27 @@ public class BuildCheckpoints {
         sanityCheck(textFile, checkpoints.size());
     }
 
-    private static void writeTextualCheckpoints(TreeMap<Integer, StoredBlock> checkpoints, File file) throws IOException {
-        PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.US_ASCII));
+
+    private static final BigInteger MAX_WORK_V1 = new BigInteger(/* 12 bytes */ "ffffffffffffffffffffffff", 16);
+
+    protected static void writeTextualCheckpoints(TreeMap<Integer, StoredBlock> checkpoints, File file) throws IOException {
+        PrintWriter writer = new PrintWriter(new OutputStreamWriter(
+            Files.newOutputStream(file.toPath()), StandardCharsets.US_ASCII));
         writer.println("TXT CHECKPOINTS 1");
         writer.println("0"); // Number of signatures to read. Do this later.
         writer.println(checkpoints.size());
-        ByteBuffer buffer = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE);
+        ByteBuffer bufferV1 = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE);
+        ByteBuffer bufferV2 = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE_V2);
         for (StoredBlock block : checkpoints.values()) {
-            block.serializeCompactLegacy(buffer);
-            writer.println(CheckpointManager.BASE64.encode(buffer.array()));
-            buffer.position(0);
+            if (block.getChainWork().compareTo(MAX_WORK_V1) <= 0) {
+                bufferV1.rewind();
+                block.serializeCompactLegacy(bufferV1);
+                writer.println(CheckpointManager.BASE64.encode(bufferV1.array()));
+            } else {
+                bufferV2.rewind();
+                block.serializeCompactV2(bufferV2);
+                writer.println(CheckpointManager.BASE64.encode(bufferV2.array()));
+            }
         }
         writer.close();
         System.out.println("Checkpoints written to '" + file.getCanonicalPath() + "'.");
