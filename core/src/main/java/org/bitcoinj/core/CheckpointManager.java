@@ -189,7 +189,7 @@ public class CheckpointManager {
                 hasher.putBytes(bytes);
                 ByteBuffer buffer = ByteBuffer.wrap(bytes);
                 StoredBlock block;
-                if (bytes.length == StoredBlock.COMPACT_SERIALIZED_SIZE){
+                if (bytes.length == StoredBlock.COMPACT_SERIALIZED_SIZE) {
                     block = StoredBlock.deserializeCompactLegacy(params, buffer);
                 } else if (bytes.length == StoredBlock.COMPACT_SERIALIZED_SIZE_V2) {
                     block = StoredBlock.deserializeCompactV2(params, buffer);
