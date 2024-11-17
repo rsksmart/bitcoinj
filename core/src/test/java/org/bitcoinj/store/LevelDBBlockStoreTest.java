@@ -67,25 +67,71 @@ public class LevelDBBlockStoreTest {
     private static final BitcoinSerializer bitcoinSerializer = new BitcoinSerializer(MAINNET, false);
 
     @Test
+    public void testLevelDbBlockStore_whenDbIsNew_shouldWork() throws Exception {
+        List<Block> existingBlockHeaders = getBlockHeaders(storedBlockHeadersInHex);
+
+        File levelDbBlockStore = File.createTempFile("leveldb", null);
+        levelDbBlockStore.delete();
+
+        Context context = new Context(MAINNET);
+        LevelDBBlockStore store = new LevelDBBlockStore(context, levelDbBlockStore);
+        store.reset();
+
+        Block block1 = existingBlockHeaders.get(0);
+        StoredBlock expectedBlock1 = new StoredBlock(block1.cloneAsHeader(), BigInteger.ZERO, 750000);
+        store.put(expectedBlock1);
+
+        Block block2 = existingBlockHeaders.get(1);
+        StoredBlock expectedBlock2 = new StoredBlock(block2.cloneAsHeader(), BigInteger.ONE, 750001);
+        store.put(expectedBlock2);
+
+        Block block3 = existingBlockHeaders.get(2);
+        StoredBlock expectedBlock3 = new StoredBlock(block3.cloneAsHeader(), MAX_WORK_V1, 750002);
+        store.put(expectedBlock3);
+
+        store.setChainHead(expectedBlock3);
+        store.close();
+
+        store = new LevelDBBlockStore(context, levelDbBlockStore);
+        try {
+
+            StoredBlock actualBlock1 = store.get(block1.getHash());
+            assertEquals(expectedBlock1, actualBlock1);
+
+            StoredBlock actualBlock2 = store.get(block2.getHash());
+            assertEquals(expectedBlock2, actualBlock2);
+
+            StoredBlock actualBlock3 = store.get(block3.getHash());
+            assertEquals(expectedBlock3, actualBlock3);
+
+            StoredBlock actualChainHead = store.getChainHead();
+            assertEquals(expectedBlock3, actualChainHead);
+        } finally {
+            store.close();
+            store.destroy();
+        }
+    }
+
+    @Test
     public void testLevelDbBlockStore_whenDbWasCreatedUsingLegacyFormat_shouldWork() throws Exception {
-        List<Block> blockHeaders = getBlockHeaders(storedBlockHeadersInHex);
+        List<Block> existingBlockHeaders = getBlockHeaders(storedBlockHeadersInHex);
 
         String levelDbBlockStorePath = getClass().getResource("/leveldb-using-legacy-format").getPath();
         File levelDbBlockStore = new File(levelDbBlockStorePath);
         Context context = new Context(MAINNET);
         LevelDBBlockStore store = new LevelDBBlockStore(context, levelDbBlockStore);
         try {
-            Block block1 = blockHeaders.get(0);
+            Block block1 = existingBlockHeaders.get(0);
             StoredBlock expectedBlock1 = new StoredBlock(block1.cloneAsHeader(), BigInteger.ZERO, 750000);
             StoredBlock actualBlock1 = store.get(block1.getHash());
             assertEquals(expectedBlock1, actualBlock1);
 
-            Block block2 = blockHeaders.get(1);
+            Block block2 = existingBlockHeaders.get(1);
             StoredBlock expectedBlock2 = new StoredBlock(block2.cloneAsHeader(), BigInteger.ONE, 750001);
             StoredBlock actualBlock2 = store.get(block2.getHash());
             assertEquals(expectedBlock2, actualBlock2);
 
-            Block block3 = blockHeaders.get(2);
+            Block block3 = existingBlockHeaders.get(2);
             StoredBlock expectedBlock3 = new StoredBlock(block3.cloneAsHeader(), MAX_WORK_V1, 750002);
             StoredBlock actualBlock3 = store.get(block3.getHash());
             assertEquals(expectedBlock3, actualBlock3);
@@ -94,6 +140,138 @@ public class LevelDBBlockStoreTest {
             assertEquals(expectedBlock3, actualChainHead);
         } finally {
             store.close();
+        }
+    }
+
+    @Test
+    public void testLevelDbBlockStore_whenAddingV2FormatBlocksToExistingDbCreatedUsingLegacyFormat_shouldWork() throws Exception {
+        List<Block> existingBlockHeaders = getBlockHeaders(storedBlockHeadersInHex);
+
+        String levelDbBlockStorePath = getClass().getResource("/leveldb-using-legacy-format-to-add-v2").getPath();
+        File levelDbBlockStore = new File(levelDbBlockStorePath);
+        Context context = new Context(MAINNET);
+
+        LevelDBBlockStore store = new LevelDBBlockStore(context, levelDbBlockStore);
+
+        List<Block> blockHeadersToAdd = getBlockHeaders(blockHeadersInHex);
+
+        // Add blocks with V2 format
+        Block block4 = blockHeadersToAdd.get(0);
+        StoredBlock expectedBlock4 = new StoredBlock(block4.cloneAsHeader(), TOO_LARGE_WORK_V1, 750003);
+        store.put(expectedBlock4);
+
+        Block block5 = blockHeadersToAdd.get(1);
+        StoredBlock expectedBlock5 = new StoredBlock(block5.cloneAsHeader(), MAX_WORK_V2, 750004);
+        store.put(expectedBlock5);
+
+        Block block6 = blockHeadersToAdd.get(2);
+        StoredBlock expectedBlock6 = new StoredBlock(block6.cloneAsHeader(), MAX_WORK_V2, 750005);
+        store.put(expectedBlock6);
+
+        // Set new chain head
+        store.setChainHead(expectedBlock6);
+        store.close();
+
+        store = new LevelDBBlockStore(context, levelDbBlockStore);
+        try {
+            Block block1 = existingBlockHeaders.get(0);
+            StoredBlock expectedBlock1 = new StoredBlock(block1.cloneAsHeader(), BigInteger.ZERO, 750000);
+            StoredBlock actualBlock1 = store.get(block1.getHash());
+            assertEquals(expectedBlock1, actualBlock1);
+
+            Block block2 = existingBlockHeaders.get(1);
+            StoredBlock expectedBlock2 = new StoredBlock(block2.cloneAsHeader(), BigInteger.ONE, 750001);
+            StoredBlock actualBlock2 = store.get(block2.getHash());
+            assertEquals(expectedBlock2, actualBlock2);
+
+            Block block3 = existingBlockHeaders.get(2);
+            StoredBlock expectedBlock3 = new StoredBlock(block3.cloneAsHeader(), MAX_WORK_V1, 750002);
+            StoredBlock actualBlock3 = store.get(block3.getHash());
+            assertEquals(expectedBlock3, actualBlock3);
+
+            StoredBlock actualBlock4 = store.get(block4.getHash());
+            assertEquals(expectedBlock4, actualBlock4);
+
+            StoredBlock actualBlock5 = store.get(block5.getHash());
+            assertEquals(expectedBlock5, actualBlock5);
+
+            StoredBlock actualBlock6 = store.get(block6.getHash());
+            assertEquals(expectedBlock6, actualBlock6);
+
+            StoredBlock actualChainHead = store.getChainHead();
+            assertEquals(expectedBlock6, actualChainHead);
+        } finally {
+            store.close();
+        }
+    }
+
+    @Test
+    public void testLevelDbBlockStore_whenAddingMixFormatBlocksAndDbIsNew_shouldWork() throws Exception {
+        List<Block> existingBlockHeaders = getBlockHeaders(storedBlockHeadersInHex);
+
+        File levelDbBlockStore = File.createTempFile("leveldb", null);
+        levelDbBlockStore.delete();
+
+        Context context = new Context(MAINNET);
+        LevelDBBlockStore store = new LevelDBBlockStore(context, levelDbBlockStore);
+        store.reset();
+
+        Block block1 = existingBlockHeaders.get(0);
+        StoredBlock expectedBlock1 = new StoredBlock(block1.cloneAsHeader(), BigInteger.ZERO, 750000);
+        store.put(expectedBlock1);
+
+        Block block2 = existingBlockHeaders.get(1);
+        StoredBlock expectedBlock2 = new StoredBlock(block2.cloneAsHeader(), BigInteger.ONE, 750001);
+        store.put(expectedBlock2);
+
+        Block block3 = existingBlockHeaders.get(2);
+        StoredBlock expectedBlock3 = new StoredBlock(block3.cloneAsHeader(), MAX_WORK_V1, 750002);
+        store.put(expectedBlock3);
+
+        // Add blocks with V2 format
+        List<Block> blockHeadersToAdd = getBlockHeaders(blockHeadersInHex);
+
+        Block block4 = blockHeadersToAdd.get(0);
+        StoredBlock expectedBlock4 = new StoredBlock(block4.cloneAsHeader(), TOO_LARGE_WORK_V1, 750003);
+        store.put(expectedBlock4);
+
+        Block block5 = blockHeadersToAdd.get(1);
+        StoredBlock expectedBlock5 = new StoredBlock(block5.cloneAsHeader(), MAX_WORK_V2, 750004);
+        store.put(expectedBlock5);
+
+        Block block6 = blockHeadersToAdd.get(2);
+        StoredBlock expectedBlock6 = new StoredBlock(block6.cloneAsHeader(), MAX_WORK_V2, 750005);
+        store.put(expectedBlock6);
+
+        store.setChainHead(expectedBlock6);
+        store.close();
+
+        store = new LevelDBBlockStore(context, levelDbBlockStore);
+        try {
+
+            StoredBlock actualBlock1 = store.get(block1.getHash());
+            assertEquals(expectedBlock1, actualBlock1);
+
+            StoredBlock actualBlock2 = store.get(block2.getHash());
+            assertEquals(expectedBlock2, actualBlock2);
+
+            StoredBlock actualBlock3 = store.get(block3.getHash());
+            assertEquals(expectedBlock3, actualBlock3);
+
+            StoredBlock actualBlock4 = store.get(block4.getHash());
+            assertEquals(expectedBlock4, actualBlock4);
+
+            StoredBlock actualBlock5 = store.get(block5.getHash());
+            assertEquals(expectedBlock5, actualBlock5);
+
+            StoredBlock actualBlock6 = store.get(block6.getHash());
+            assertEquals(expectedBlock6, actualBlock6);
+
+            StoredBlock actualChainHead = store.getChainHead();
+            assertEquals(expectedBlock6, actualChainHead);
+        } finally {
+            store.close();
+            store.destroy();
         }
     }
 
