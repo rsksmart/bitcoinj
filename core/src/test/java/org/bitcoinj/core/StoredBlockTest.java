@@ -36,7 +36,7 @@ public class StoredBlockTest {
     private static final int blockHeight = 849137;
     private static final Block block = bitcoinSerializer.makeBlock(Hex.decode(blockHeader));
 
-    private static final int blockCapacity = StoredBlock.COMPACT_SERIALIZED_SIZE;
+    private static final int blockCapacity = StoredBlock.COMPACT_SERIALIZED_SIZE_LEGACY;
     private ByteBuffer blockBuffer;
 
     @Rule

@@ -35,16 +35,18 @@ import java.util.Locale;
  */
 public class StoredBlock {
 
-    /* Size in bytes to represent the total amount of work done so far on this chain. As of June 22, 2024, it takes 12
-     unsigned bytes to store this value, so developers should use the V2 format. */
-    private static final int CHAIN_WORK_BYTES_V1 = 12;
+    /* @deprecated Use {@link #CHAIN_WORK_BYTES_V2} instead.
+        Size in bytes to represent the total amount of work done so far on this chain. As of June 22, 2024, it takes 12
+        unsigned bytes to store this value, so developers should use the V2 format.
+     */
+    private static final int CHAIN_WORK_BYTES_LEGACY = 12;
     // Size in bytes to represent the total amount of work done so far on this chain.
     private static final int CHAIN_WORK_BYTES_V2 = 32;
     // Size in bytes(int) to represent btc block height
     private static final int HEIGHT_BYTES = 4;
 
     // Size in bytes of serialized block in legacy format by {@link #serializeCompactLegacy(ByteBuffer)}
-    public static final int COMPACT_SERIALIZED_SIZE = Block.HEADER_SIZE + CHAIN_WORK_BYTES_V1 + HEIGHT_BYTES;
+    public static final int COMPACT_SERIALIZED_SIZE_LEGACY = Block.HEADER_SIZE + CHAIN_WORK_BYTES_LEGACY + HEIGHT_BYTES;
     // Size in bytes of serialized block in V2 format by {@link #serializeCompactV2(ByteBuffer)}
     public static final int COMPACT_SERIALIZED_SIZE_V2 = Block.HEADER_SIZE + CHAIN_WORK_BYTES_V2 + HEIGHT_BYTES;
 
@@ -121,7 +123,7 @@ public class StoredBlock {
     }
 
     /**
-     * * @deprecated Use {@link #serializeCompactV2(ByteBuffer)} instead.
+     * @deprecated Use {@link #serializeCompactV2(ByteBuffer)} instead.
      *
      * Serializes the stored block to a custom packed format. Used internally.
      * As of June 22, 2024, it takes 12 unsigned bytes to store the chain work value,
@@ -131,13 +133,8 @@ public class StoredBlock {
      */
     @Deprecated
     public void serializeCompactLegacy(ByteBuffer buffer) {
-        byte[] chainWorkBytes = Utils.bigIntegerToBytes(getChainWork(), CHAIN_WORK_BYTES_V1);
-        buffer.put(chainWorkBytes);
-        buffer.putInt(getHeight());
-        // Using unsafeBitcoinSerialize here can give us direct access to the same bytes we read off the wire,
-        // avoiding serialization round-trips.
-        byte[] bytes = getHeader().unsafeBitcoinSerialize();
-        buffer.put(bytes, 0, Block.HEADER_SIZE);  // Trim the trailing 00 byte (zero transactions).
+        serializeCompact(buffer, CHAIN_WORK_BYTES_LEGACY);
+
     }
 
     /**
@@ -146,7 +143,11 @@ public class StoredBlock {
      * @param buffer buffer to write to
      */
     public void serializeCompactV2(ByteBuffer buffer) {
-        byte[] chainWorkBytes = Utils.bigIntegerToBytes(getChainWork(), CHAIN_WORK_BYTES_V2);
+        serializeCompact(buffer, CHAIN_WORK_BYTES_V2);
+    }
+
+    private void serializeCompact(ByteBuffer buffer, int chainWorkSize) {
+        byte[] chainWorkBytes = Utils.bigIntegerToBytes(getChainWork(), chainWorkSize);
         buffer.put(chainWorkBytes);
         buffer.putInt(getHeight());
         // Using unsafeBitcoinSerialize here can give us direct access to the same bytes we read off the wire,
@@ -167,13 +168,7 @@ public class StoredBlock {
      */
     @Deprecated
     public static StoredBlock deserializeCompactLegacy(NetworkParameters params, ByteBuffer buffer) throws ProtocolException {
-        byte[] chainWorkBytes = new byte[StoredBlock.CHAIN_WORK_BYTES_V1];
-        buffer.get(chainWorkBytes);
-        BigInteger chainWork = new BigInteger(1, chainWorkBytes);
-        int height = buffer.getInt();  // +4 bytes
-        byte[] header = new byte[Block.HEADER_SIZE + 1];    // Extra byte for the 00 transactions length.
-        buffer.get(header, 0, Block.HEADER_SIZE);
-        return new StoredBlock(params.getDefaultSerializer().makeBlock(header), chainWork, height);
+        return deserializeCompact(params, buffer, StoredBlock.CHAIN_WORK_BYTES_LEGACY);
     }
 
     /**
@@ -183,7 +178,12 @@ public class StoredBlock {
      * @return deserialized stored block
      */
     public static StoredBlock deserializeCompactV2(NetworkParameters params, ByteBuffer buffer) throws ProtocolException {
-        byte[] chainWorkBytes = new byte[StoredBlock.CHAIN_WORK_BYTES_V2];
+        return deserializeCompact(params, buffer, StoredBlock.CHAIN_WORK_BYTES_V2);
+    }
+
+    private static StoredBlock deserializeCompact(NetworkParameters params, ByteBuffer buffer,
+        int chainWorkSize) {
+        byte[] chainWorkBytes = new byte[chainWorkSize];
         buffer.get(chainWorkBytes);
         BigInteger chainWork = new BigInteger(1, chainWorkBytes);
         int height = buffer.getInt();  // +4 bytes

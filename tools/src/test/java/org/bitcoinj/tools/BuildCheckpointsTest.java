@@ -52,14 +52,14 @@ public class BuildCheckpointsTest {
     @Before
     public void setUp() throws Exception {
         checkpoints = new TreeMap<>();
-        textFile = new File("checkpoints.txt");
-        textFile.delete();
+        textFile = File.createTempFile("checkpoints", ".txt");
+        textFile.deleteOnExit();
     }
 
     @Test
     public void writeTextualCheckpoints_whenBlocksChainWorkFits12Bytes_shouldBuiltFile() throws IOException {
         assertFalse(textFile.exists());
-        populateCheckpoints(CHECKPOINTS_12_BYTES_CHAINWORK_ENCODED, StoredBlock.COMPACT_SERIALIZED_SIZE, MAINNET);
+        populateCheckpoints(CHECKPOINTS_12_BYTES_CHAINWORK_ENCODED, StoredBlock.COMPACT_SERIALIZED_SIZE_LEGACY, MAINNET);
         BuildCheckpoints.writeTextualCheckpoints(checkpoints, textFile);
         assertTrue(textFile.exists());
 
@@ -111,7 +111,7 @@ public class BuildCheckpointsTest {
             buffer.put(bytes);
             buffer.flip();
             StoredBlock block;
-            if (blockFormatSize == StoredBlock.COMPACT_SERIALIZED_SIZE) {
+            if (blockFormatSize == StoredBlock.COMPACT_SERIALIZED_SIZE_LEGACY) {
                 block = StoredBlock.deserializeCompactLegacy(networkParameters, buffer);
             } else {
                 block = StoredBlock.deserializeCompactV2(networkParameters, buffer);
@@ -141,7 +141,7 @@ public class BuildCheckpointsTest {
     @Test
     public void writeTextualCheckpoints_whenMixBlocksChainWork_shouldBuiltFile() throws IOException {
         assertFalse(textFile.exists());
-        populateCheckpoints(CHECKPOINTS_12_BYTES_CHAINWORK_ENCODED, StoredBlock.COMPACT_SERIALIZED_SIZE, MAINNET);
+        populateCheckpoints(CHECKPOINTS_12_BYTES_CHAINWORK_ENCODED, StoredBlock.COMPACT_SERIALIZED_SIZE_LEGACY, MAINNET);
         populateCheckpoints(CHECKPOINTS_32_BYTES_CHAINWORK_ENCODED, StoredBlock.COMPACT_SERIALIZED_SIZE_V2, MAINNET);
         BuildCheckpoints.writeTextualCheckpoints(checkpoints, textFile);
         assertTrue(textFile.exists());

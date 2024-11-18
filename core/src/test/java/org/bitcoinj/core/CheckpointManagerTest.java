@@ -81,7 +81,7 @@ public class CheckpointManagerTest {
     @Test
     public void readBinaryCheckpoints_whenCheckpointChainWorkIs12Bytes() throws IOException {
         List<StoredBlock> checkpoints = getCheckpoints(CHECKPOINTS_12_BYTES_CHAINWORK_ENCODED,
-            StoredBlock.COMPACT_SERIALIZED_SIZE);
+            StoredBlock.COMPACT_SERIALIZED_SIZE_LEGACY);
         try (InputStream binaryCheckpoint = generateBinaryCheckpoints(checkpoints)) {
             CheckpointManager checkpointManager = new CheckpointManager(MAINNET, binaryCheckpoint);
 
@@ -92,14 +92,14 @@ public class CheckpointManagerTest {
 
     private List<StoredBlock> getCheckpoints(List<String> checkpoints, int blockFormatSize) {
         ByteBuffer buffer = ByteBuffer.allocate(blockFormatSize);
-        List<StoredBlock> decodedCheckpoints = new ArrayList<StoredBlock>();
+        List<StoredBlock> decodedCheckpoints = new ArrayList<>();
         for (String checkpoint : checkpoints) {
             byte[] bytes = BASE64.decode(checkpoint);
             buffer.clear();
             buffer.put(bytes);
             buffer.flip();
             StoredBlock block;
-            if (blockFormatSize == StoredBlock.COMPACT_SERIALIZED_SIZE) {
+            if (blockFormatSize == StoredBlock.COMPACT_SERIALIZED_SIZE_LEGACY) {
                 block = StoredBlock.deserializeCompactLegacy(MAINNET, buffer);
             } else {
                 block = StoredBlock.deserializeCompactV2(MAINNET, buffer);
@@ -131,14 +131,14 @@ public class CheckpointManagerTest {
             digestStream.on(true);
             dataStream.writeInt(checkpoints.size());
 
-            ByteBuffer bufferV1 = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE);
+            ByteBuffer bufferV1 = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE_LEGACY);
             ByteBuffer bufferV2 = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE_V2);
 
             for (StoredBlock block : checkpoints) {
                 boolean isV1 = block.getChainWork().compareTo(MAX_WORK_V1) <= 0;
                 ByteBuffer buffer = isV1 ? bufferV1 : bufferV2;
                 serializeBlock(buffer, block, isV1);
-                int limit = isV1 ? StoredBlock.COMPACT_SERIALIZED_SIZE
+                int limit = isV1 ? StoredBlock.COMPACT_SERIALIZED_SIZE_LEGACY
                     : StoredBlock.COMPACT_SERIALIZED_SIZE_V2;
                 dataStream.write(buffer.array(), 0, limit);
             }
@@ -165,7 +165,7 @@ public class CheckpointManagerTest {
     public void readBinaryCheckpoints_whenMixFormats_shouldFail()
         throws IOException {
         List<StoredBlock> checkpointsV1Format = getCheckpoints(CHECKPOINTS_12_BYTES_CHAINWORK_ENCODED,
-            StoredBlock.COMPACT_SERIALIZED_SIZE);
+            StoredBlock.COMPACT_SERIALIZED_SIZE_LEGACY);
         List<StoredBlock> checkpointsV2Format = getCheckpoints(CHECKPOINTS_32_BYTES_CHAINWORK_ENCODED,
             StoredBlock.COMPACT_SERIALIZED_SIZE_V2);
 

@@ -137,7 +137,7 @@ public class CheckpointManager {
             digestInputStream.on(true);
             int numCheckpoints = dis.readInt();
             checkState(numCheckpoints > 0);
-            final int size = StoredBlock.COMPACT_SERIALIZED_SIZE;
+            final int size = StoredBlock.COMPACT_SERIALIZED_SIZE_LEGACY;
             ByteBuffer buffer = ByteBuffer.allocate(size);
             for (int i = 0; i < numCheckpoints; i++) {
                 if (dis.read(buffer.array(), 0, size) < size)
@@ -150,7 +150,7 @@ public class CheckpointManager {
             int actualCheckpointsSize = dis.available();
             int expectedCheckpointsSize = numCheckpoints * size;
             // Check if there are any bytes left in the stream. If it does, it means that checkpoints are malformed
-            if (dis.available() > 0) {
+            if (actualCheckpointsSize > 0) {
                 String message = String.format(
                     "Checkpoints size did not match size for version 1 format. Expected checkpoints %d with size of %d bytes, but actual size was %d.",
                     numCheckpoints, expectedCheckpointsSize, actualCheckpointsSize);
@@ -189,7 +189,7 @@ public class CheckpointManager {
                 hasher.putBytes(bytes);
                 ByteBuffer buffer = ByteBuffer.wrap(bytes);
                 StoredBlock block;
-                if (bytes.length == StoredBlock.COMPACT_SERIALIZED_SIZE) {
+                if (bytes.length == StoredBlock.COMPACT_SERIALIZED_SIZE_LEGACY) {
                     block = StoredBlock.deserializeCompactLegacy(params, buffer);
                 } else if (bytes.length == StoredBlock.COMPACT_SERIALIZED_SIZE_V2) {
                     block = StoredBlock.deserializeCompactV2(params, buffer);
