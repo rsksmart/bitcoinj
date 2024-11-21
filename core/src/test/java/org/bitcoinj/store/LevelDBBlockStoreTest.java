@@ -147,7 +147,8 @@ public class LevelDBBlockStoreTest {
     public void testLevelDbBlockStore_whenAddingV2FormatBlocksToExistingDbCreatedUsingLegacyFormat_shouldWork() throws Exception {
         List<Block> existingBlockHeaders = getBlockHeaders(storedBlockHeadersInHex);
 
-        String levelDbBlockStorePath = getClass().getResource("/leveldb-using-legacy-format-to-add-v2").getPath();
+        String levelDbBlockStorePath = getClass().getResource(
+            "/leveldb-using-legacy-format-to-add-v2").getPath();
         File levelDbBlockStore = new File(levelDbBlockStorePath);
         Context context = new Context(MAINNET);
 
