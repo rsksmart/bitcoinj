@@ -8,6 +8,8 @@ dependencies {
     implementation 'com.google.guava:guava:28.1-android'
     implementation 'net.sf.jopt-simple:jopt-simple:5.0.4'
     implementation 'org.slf4j:slf4j-jdk14:1.7.29'
+    testImplementation 'junit:junit:4.12'
+    testImplementation 'org.easymock:easymock:3.2'
 }
 
 sourceCompatibility = 1.8

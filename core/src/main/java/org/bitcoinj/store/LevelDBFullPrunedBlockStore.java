@@ -495,7 +495,7 @@ public class LevelDBFullPrunedBlockStore implements FullPrunedBlockStore {
             beginMethod("putUpdateStoredBlock");
         Sha256Hash hash = storedBlock.getHeader().getHash();
         ByteBuffer bb = ByteBuffer.allocate(97);
-        storedBlock.serializeCompact(bb);
+        storedBlock.serializeCompactLegacy(bb);
         bb.put((byte) (wasUndoable ? 1 : 0));
         batchPut(getKey(KeyType.HEADERS_ALL, hash), bb.array());
         if (instrument)
@@ -640,7 +640,7 @@ public class LevelDBFullPrunedBlockStore implements FullPrunedBlockStore {
         }
         // TODO Should I chop the last byte off? Seems to work with it left
         // there...
-        StoredBlock stored = StoredBlock.deserializeCompact(params, ByteBuffer.wrap(result));
+        StoredBlock stored = StoredBlock.deserializeCompactLegacy(params, ByteBuffer.wrap(result));
         stored.getHeader().verifyHeader();
 
         if (instrument)
