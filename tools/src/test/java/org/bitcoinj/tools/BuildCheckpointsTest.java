@@ -19,6 +19,7 @@ import java.util.TreeMap;
 import org.bitcoinj.core.CheckpointManager;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.StoredBlock;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -53,7 +54,12 @@ public class BuildCheckpointsTest {
     public void setUp() throws Exception {
         checkpoints = new TreeMap<>();
         textFile = File.createTempFile("checkpoints", ".txt");
-        textFile.deleteOnExit();
+        textFile.delete();
+    }
+
+    @After
+    public void tearDown() {
+        textFile.delete();
     }
 
     @Test
