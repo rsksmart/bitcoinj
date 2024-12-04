@@ -196,7 +196,7 @@ public class SPVBlockStore implements BlockStore {
             Sha256Hash hash = block.getHeader().getHash();
             notFoundCache.remove(hash);
             buffer.put(hash.getBytes());
-            block.serializeCompact(buffer);
+            block.serializeCompactLegacy(buffer);
             setRingCursor(buffer, buffer.position());
             blockCache.put(hash, block);
         } finally { lock.unlock(); }
@@ -233,7 +233,7 @@ public class SPVBlockStore implements BlockStore {
                 buffer.get(scratch);
                 if (Arrays.equals(scratch, targetHashBytes)) {
                     // Found the target.
-                    StoredBlock storedBlock = StoredBlock.deserializeCompact(params, buffer);
+                    StoredBlock storedBlock = StoredBlock.deserializeCompactLegacy(params, buffer);
                     blockCache.put(hash, storedBlock);
                     return storedBlock;
                 }
@@ -300,7 +300,7 @@ public class SPVBlockStore implements BlockStore {
         return params;
     }
 
-    protected static final int RECORD_SIZE = 32 /* hash */ + StoredBlock.COMPACT_SERIALIZED_SIZE;
+    protected static final int RECORD_SIZE = 32 /* hash */ + StoredBlock.COMPACT_SERIALIZED_SIZE_LEGACY;
 
     // File format:
     //   4 header bytes = "SPVB"

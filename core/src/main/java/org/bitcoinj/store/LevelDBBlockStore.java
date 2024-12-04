@@ -16,6 +16,7 @@
 
 package org.bitcoinj.store;
 
+import java.math.BigInteger;
 import org.bitcoinj.core.*;
 import org.fusesource.leveldbjni.*;
 import org.iq80.leveldb.*;
@@ -35,7 +36,10 @@ public class LevelDBBlockStore implements BlockStore {
 
     private final Context context;
     private DB db;
-    private final ByteBuffer buffer = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE);
+
+    private final ByteBuffer legacyBuffer = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE_LEGACY);
+    private final ByteBuffer bufferV2 = ByteBuffer.allocate(StoredBlock.COMPACT_SERIALIZED_SIZE_V2);
+
     private final File path;
 
     /** Creates a LevelDB SPV block store using the JNI/C++ version of LevelDB. */
@@ -76,11 +80,20 @@ public class LevelDBBlockStore implements BlockStore {
         setChainHead(storedGenesis);
     }
 
+    private static final BigInteger MAX_WORK_V1 = new BigInteger(/* 12 bytes */ "ffffffffffffffffffffffff", 16);
+
     @Override
     public synchronized void put(StoredBlock block) throws BlockStoreException {
-        buffer.clear();
-        block.serializeCompact(buffer);
-        db.put(block.getHeader().getHash().getBytes(), buffer.array());
+        legacyBuffer.clear();
+        if (block.getChainWork().compareTo(MAX_WORK_V1) <= 0) {
+            legacyBuffer.rewind();
+            block.serializeCompactLegacy(legacyBuffer);
+            db.put(block.getHeader().getHash().getBytes(), legacyBuffer.array());
+        } else {
+            bufferV2.rewind();
+            block.serializeCompactV2(bufferV2);
+            db.put(block.getHeader().getHash().getBytes(), bufferV2.array());
+        }
     }
 
     @Override @Nullable
@@ -88,7 +101,12 @@ public class LevelDBBlockStore implements BlockStore {
         byte[] bits = db.get(hash.getBytes());
         if (bits == null)
             return null;
-        return StoredBlock.deserializeCompact(context.getParams(), ByteBuffer.wrap(bits));
+
+        if (bits.length == StoredBlock.COMPACT_SERIALIZED_SIZE_LEGACY){
+            return StoredBlock.deserializeCompactLegacy(context.getParams(), ByteBuffer.wrap(bits));
+        } else {
+            return StoredBlock.deserializeCompactV2(context.getParams(), ByteBuffer.wrap(bits));
+        }
     }
 
     @Override
