@@ -206,11 +206,15 @@ public class TestNet4Params extends AbstractBitcoinNetParams {
      * first block carrying a real difficulty (also stopping at the genesis block or a period boundary).
      */
     private StoredBlock findLastNonMinimumDifficultyBlock(final StoredBlock from, final BlockStore blockStore)
-        throws BlockStoreException {
+        throws VerificationException, BlockStoreException {
 
         StoredBlock cursor = from;
-        while (isSkippableMinimumDifficultyBlock(cursor)) {
+        while (cursor != null && isSkippableMinimumDifficultyBlock(cursor)) {
             cursor = cursor.getPrev(blockStore);
+        }
+        if (cursor == null) {
+            throw new VerificationException(
+                "Unable to locate last non-minimum difficulty block: block store does not contain required history.");
         }
         return cursor;
     }
@@ -262,8 +266,14 @@ public class TestNet4Params extends AbstractBitcoinNetParams {
      * Reduces a freshly-computed target to the precision of the declared compact bits and re-encodes it, so
      * the two can be compared exactly (the calculation is higher-precision than the compact-bits format).
      */
-    private static long reduceToDeclaredPrecision(final BigInteger target, final long declaredTargetCompact) {
-        int accuracyBytes = (int) (declaredTargetCompact >>> 24) - 3;
+    private static long reduceToDeclaredPrecision(final BigInteger target, final long declaredTargetCompact)
+        throws VerificationException {
+        int exponent = (int) (declaredTargetCompact >>> 24);
+        if (exponent < 3 || exponent > 32) {
+            throw new VerificationException(
+                "Invalid difficulty target (nBits): " + Long.toHexString(declaredTargetCompact));
+        }
+        int accuracyBytes = exponent - 3;
         BigInteger precisionMask = BigInteger.valueOf(0xFFFFFFL).shiftLeft(accuracyBytes * 8);
         return Utils.encodeCompactBits(target.and(precisionMask));
     }
