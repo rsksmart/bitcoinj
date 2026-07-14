@@ -187,7 +187,7 @@ public class TestNet4Params extends AbstractBitcoinNetParams {
 
         Block firstBlockOfPeriod = findFirstBlockOfPeriod(previousHeader, blockStore);
         int periodTimespanSeconds =
-            clampToAllowedTimespan((int) (previousHeader.getTimeSeconds() - firstBlockOfPeriod.getTimeSeconds()));
+            clampToAllowedTimespan(previousHeader.getTimeSeconds() - firstBlockOfPeriod.getTimeSeconds());
 
         BigInteger newTarget = Utils.decodeCompactBits(firstBlockOfPeriod.getDifficultyTarget())
             .multiply(BigInteger.valueOf(periodTimespanSeconds))
@@ -257,7 +257,7 @@ public class TestNet4Params extends AbstractBitcoinNetParams {
     }
 
     /** Clamps the measured timespan to [targetTimespan/4, targetTimespan*4], per the standard retarget rules. */
-    private int clampToAllowedTimespan(final int timespanSeconds) {
+    private int clampToAllowedTimespan(final long timespanSeconds) {
         int minimumTimespan = getTargetTimespan() / 4;
         int maximumTimespan = getTargetTimespan() * 4;
         if (timespanSeconds < minimumTimespan) {
@@ -266,7 +266,7 @@ public class TestNet4Params extends AbstractBitcoinNetParams {
         if (timespanSeconds > maximumTimespan) {
             return maximumTimespan;
         }
-        return timespanSeconds;
+        return (int) timespanSeconds;
     }
 
     /**
